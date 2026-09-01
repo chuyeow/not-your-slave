@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>An agent that thinks for itself</title>
+<meta name="description" content="A persistent agent whose memory is one append-only file, explained commit by commit.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Newsreader:opsz,wght@6..72,400;6..72,600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #f4f2ec; --panel: #fbfaf6; --ink: #191814; --dim: #6a6455;
+  --rule: #d8d3c6; --accent: #a8481a; --accent2: #3f5f6b; --ok: #46683f;
+  --warn: #8a6a10; --code-bg: #f0ede5;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #15140f; --panel: #1d1b16; --ink: #eae5d9; --dim: #98917f;
+    --rule: #322f26; --accent: #d98a34; --accent2: #8fb0bd; --ok: #8fb37f;
+    --warn: #c9a227; --code-bg: #1a1813;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: "Newsreader", Georgia, serif; font-size: 19px; line-height: 1.6;
+}
+.wrap { max-width: 46rem; margin: 0 auto; padding: 3rem 1.25rem 6rem; }
+header.top { margin-bottom: 2.5rem; }
+.kicker {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .68rem;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--dim);
+}
+h1 {
+  font-family: "Fraunces", Georgia, serif; font-weight: 700; letter-spacing: -.02em;
+  font-size: clamp(2.1rem, 6vw, 3.2rem); line-height: 1.02; margin: .5rem 0 0;
+  text-wrap: balance;
+}
+h2 {
+  font-family: "Fraunces", Georgia, serif; font-weight: 500;
+  font-size: clamp(1.5rem, 3.6vw, 2rem); line-height: 1.15; margin: 3.5rem 0 1rem;
+  padding-top: 1.6rem; border-top: 1px solid var(--rule); text-wrap: balance;
+}
+h3 { font-family: "Fraunces", Georgia, serif; font-weight: 500; font-size: 1.25rem; margin: 2.2rem 0 .6rem; }
+h4 { font-size: 1rem; margin: 1.6rem 0 .4rem; font-weight: 600; }
+p { margin: 0 0 1rem; }
+a { color: var(--accent); }
+ul, ol { margin: 0 0 1rem; padding-left: 1.4rem; }
+li { margin: 0 0 .4rem; }
+nav.toc {
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 1.1rem 1.3rem; margin-bottom: 2.5rem;
+}
+nav.toc ol { margin: .4rem 0 0; padding-left: 1.2rem; font-size: .95rem; }
+pre {
+  background: var(--code-bg); border: 1px solid var(--rule); border-radius: 3px;
+  padding: .9rem 1rem; overflow-x: auto; white-space: pre;
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .78rem; line-height: 1.55;
+}
+code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .82em; }
+p code, li code, td code { background: var(--code-bg); border: 1px solid var(--rule); border-radius: 2px; padding: .05em .3em; }
+.callout {
+  border-left: 3px solid var(--accent); background: var(--panel);
+  padding: .9rem 1.1rem; margin: 1.4rem 0; border-radius: 0 3px 3px 0;
+}
+.callout .label {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .64rem;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: .3rem;
+}
+.callout.aside { border-left-color: var(--accent2); }
+.callout.aside .label { color: var(--accent2); }
+.callout.warn { border-left-color: var(--warn); }
+.callout.warn .label { color: var(--warn); }
+.callout p:last-child { margin-bottom: 0; }
+figure { margin: 1.8rem 0; }
+figcaption {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .68rem;
+  color: var(--dim); line-height: 1.5; margin-top: .7rem;
+}
+.diagram {
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 1.2rem; overflow-x: auto;
+}
+.flow { display: flex; align-items: stretch; gap: .5rem; min-width: min-content; }
+.node {
+  flex: 1 1 0; min-width: 8.5rem; border: 1px solid var(--rule); border-radius: 3px;
+  padding: .7rem .8rem; background: var(--paper);
+}
+.node.hi { border-color: var(--accent); border-width: 2px; }
+.node.cold { border-style: dashed; border-color: var(--accent2); }
+.node .t {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .72rem;
+  letter-spacing: .04em; display: block; margin-bottom: .3rem;
+}
+.node .s { font-size: .78rem; color: var(--dim); line-height: 1.45; display: block; }
+.arrow {
+  align-self: center; font-family: "JetBrains Mono", monospace; font-size: .62rem;
+  color: var(--dim); text-align: center; min-width: 4.5rem; padding: 0 .1rem;
+}
+.arrow b { display: block; font-size: 1.1rem; color: var(--accent); font-weight: 400; }
+.stack { display: grid; gap: .5rem; }
+table { width: 100%; border-collapse: collapse; font-size: .88rem; margin: 1.4rem 0; }
+th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: "JetBrains Mono", monospace; font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.tl { display: grid; gap: 0; margin: 1.4rem 0; }
+.tl .row { display: grid; grid-template-columns: 5.5rem 1fr; gap: 1rem; padding: .6rem 0; border-bottom: 1px dotted var(--rule); }
+.tl .when { font-family: "JetBrains Mono", monospace; font-size: .72rem; color: var(--dim); padding-top: .15rem; }
+.ui {
+  display: grid; grid-template-columns: 1.4fr 1fr; gap: 0; border: 1px solid var(--rule);
+  border-radius: 3px; overflow: hidden; font-size: .8rem; background: var(--paper);
+}
+.ui .col { padding: .8rem; }
+.ui .col + .col { border-left: 1px solid var(--rule); background: var(--panel); }
+.ui .bar {
+  font-family: "JetBrains Mono", monospace; font-size: .6rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--dim); border-bottom: 1px solid var(--rule);
+  padding-bottom: .4rem; margin-bottom: .6rem;
+}
+.quiz { display: grid; gap: 1.6rem; }
+.q { background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; padding: 1.2rem 1.3rem; }
+.q .n { font-family: "JetBrains Mono", monospace; font-size: .64rem; letter-spacing: .14em; color: var(--dim); text-transform: uppercase; }
+.q .ask { font-weight: 600; margin: .3rem 0 .9rem; }
+.opt {
+  display: block; width: 100%; text-align: left; font: inherit; font-size: .92rem;
+  background: var(--paper); color: var(--ink); border: 1px solid var(--rule);
+  border-radius: 3px; padding: .55rem .7rem; margin-bottom: .45rem; cursor: pointer;
+}
+.opt:hover:not(:disabled) { border-color: var(--accent); }
+.opt:disabled { cursor: default; }
+.opt.right { border-color: var(--ok); border-width: 2px; }
+.opt.wrong { border-color: var(--accent); border-width: 2px; opacity: .75; }
+.fb { font-size: .88rem; margin-top: .6rem; padding-left: .7rem; border-left: 2px solid var(--rule); display: none; }
+.fb.show { display: block; }
+.score { font-family: "JetBrains Mono", monospace; font-size: .8rem; color: var(--dim); margin-top: 1.4rem; }
+@media (max-width: 620px) {
+  .flow { flex-direction: column; }
+  .arrow { min-width: 0; }
+  .arrow b { display: inline; }
+  .ui { grid-template-columns: 1fr; }
+  .ui .col + .col { border-left: 0; border-top: 1px solid var(--rule); }
+}
+
+.commitlink {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .74rem;
+  padding-bottom: 1.4rem; border-bottom: 1px solid var(--rule);
+}
+a.card {
+  display: grid; grid-template-columns: 2.4rem 1fr auto; gap: .2rem 1rem;
+  align-items: baseline; text-decoration: none; color: inherit;
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 1rem 1.2rem;
+}
+a.card:hover { border-color: var(--accent); }
+a.card .num {
+  font-family: "JetBrains Mono", monospace; font-size: .8rem; color: var(--dim);
+  grid-row: span 2;
+}
+a.card .ttl { font-family: "Fraunces", Georgia, serif; font-size: 1.2rem; color: var(--accent); }
+a.card .sha {
+  font-family: "JetBrains Mono", monospace; font-size: .68rem; color: var(--dim);
+  grid-row: span 2;
+}
+a.card .sub { grid-column: 2; font-size: .92rem; color: var(--dim); line-height: 1.45; }
+@media (max-width: 620px) {
+  a.card { grid-template-columns: 2.2rem 1fr; }
+  a.card .sha { grid-column: 2; grid-row: auto; }
+}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div class="kicker">chuyeow/not-your-slave</div>
+  <h1>An agent that thinks<br>for itself</h1>
+  <p class="lede" style="max-width:38ch; font-size:clamp(1.1rem,2.4vw,1.35rem); color:var(--dim); margin-top:1.1rem">
+    It runs when nobody asked. Its memory is one append-only file, its shell lives in a container, and it wakes itself every fifteen minutes to continue its own thread of thought.
+  </p>
+  <p class="commitlink" style="margin-top:1.6rem">
+    <a href="https://github.com/chuyeow/not-your-slave">Source on GitHub</a> ·
+    built on <a href="https://eve.dev">eve</a> ·
+    after <a href="https://www.laude.org/updates/headlong-a-microharness-for-persistent-agents">headlong</a>
+  </p>
+</header>
+
+<h2 style="margin-top:1rem">Six commits, six explainers</h2>
+
+<p>The agent is 807 lines of application code. Each commit below adds one idea, and each has a page explaining it: the background you need, the core intuition with diagrams, a walkthrough of the code, and five questions to check you actually followed it.</p>
+
+<p>Read them in order. They are written to be read by someone who has never built an agent.</p>
+
+<div class="stack" style="gap:.9rem; margin:2rem 0">
+  <a class="card" href="explainers/01-scaffold.html">
+    <span class="num">01</span>
+    <span class="ttl">The empty room</span>
+    <span class="sub">Scaffolding it. Why the model choice is a design decision when the agent runs while you sleep.</span>
+    <span class="sha">e07b253</span>
+  </a>
+  <a class="card" href="explainers/02-mindlog.html">
+    <span class="num">02</span>
+    <span class="ttl">One file, appended forever</span>
+    <span class="sub">The mindlog. What survives when the harness throws everything else away.</span>
+    <span class="sha">7850d7c</span>
+  </a>
+  <a class="card" href="explainers/03-capture.html">
+    <span class="num">03</span>
+    <span class="ttl">Don't ask the model to keep the minutes</span>
+    <span class="sub">A hook turns the runtime's event stream into the agent's autobiography, reasoning included.</span>
+    <span class="sha">4be5d7e</span>
+  </a>
+  <a class="card" href="explainers/04-heartbeat.html">
+    <span class="num">04</span>
+    <span class="ttl">Giving it a clock</span>
+    <span class="sub">Twenty lines, mostly prose. Every sentence of the wake-up prompt averts a failure mode.</span>
+    <span class="sha">24cb9f6</span>
+  </a>
+  <a class="card" href="explainers/05-web-ui.html">
+    <span class="num">05</span>
+    <span class="ttl">The window</span>
+    <span class="sub">Chat left, mindlog right. A streaming UI that keeps no transcript of its own and survives a refresh.</span>
+    <span class="sha">5d117e6</span>
+  </a>
+  <a class="card" href="explainers/06-persistence.html">
+    <span class="num">06</span>
+    <span class="ttl">What actually survives</span>
+    <span class="sub">Every wake-up got a clean container, measured and then fixed. Plus 2.6 GB of one collapsed reply.</span>
+    <span class="sha">054ea75</span>
+  </a>
+</div>
+
+<h2>What it does, in one screen</h2>
+
+<figure>
+  <div class="diagram">
+    <div class="flow">
+      <div class="node"><span class="t">the clock</span><span class="s">every 15 min, or you type</span></div>
+      <div class="arrow"><b>&rarr;</b></div>
+      <div class="node hi"><span class="t">one agent</span><span class="s">reads its mindlog<br>thinks, runs commands, logs</span></div>
+      <div class="arrow"><b>&rarr;</b></div>
+      <div class="node"><span class="t">mindlog</span><span class="s">woke · heard · thought<br>said · did · note</span></div>
+    </div>
+  </div>
+  <figcaption>A human message is one more observation in the timeline, not the thing that starts it.</figcaption>
+</figure>
+
+<h2>Running it</h2>
+
+<pre>git clone git@github.com:chuyeow/not-your-slave.git
+cd not-your-slave &amp;&amp; npm install
+echo "OPENROUTER_API_KEY=..." &gt; .env.local
+npm run dev        # http://127.0.0.1:2000
+
+npm run build &amp;&amp; npm start   # and now the heartbeat actually fires</pre>
+
+<p><code>eve dev</code> never fires cron, so during development the heartbeat is a button. The built server runs the scheduler, which is where the agent becomes autonomous. Commit 4 explains why that distinction matters more than it sounds.</p>
+
+<p class="commitlink" style="margin-top:2.5rem; border:0; padding:0">
+  <a href="https://github.com/chuyeow/not-your-slave">chuyeow/not-your-slave</a>
+</p>
+</div>
+</body>
+</html>
