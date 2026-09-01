@@ -1,19 +1,35 @@
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { defineAgent } from "eve";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { wrapLanguageModel, type LanguageModelMiddleware } from "ai";
 
 const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
 
+// This model has twice collapsed into token soup mid-reply and streamed ~128k
+// characters before anything stopped it. limits.maxOutputTokensPerSession does
+// not help: a provider only reports usage once a call finishes, so the runaway
+// call is always allowed to complete. Capping every call is what actually stops
+// it. Normal replies here run a few hundred tokens.
+const CAP = 4096;
+
+const capOutputTokens: LanguageModelMiddleware = {
+  transformParams: async ({ params }) => ({
+    ...params,
+    maxOutputTokens: Math.min(params.maxOutputTokens ?? CAP, CAP),
+  }),
+};
+
 export default defineAgent({
   // Cheap open weights: $0.075/M in, $0.25/M out. Swap the id to change models.
-  model: openrouter.chat("z-ai/glm-5.3-flash"),
+  model: wrapLanguageModel({
+    model: openrouter.chat("z-ai/glm-5.3-flash"),
+    middleware: capOutputTokens,
+  }),
   // Not in the AI Gateway catalog, so eve can't look the window up itself.
   modelContextWindowTokens: 1_310_720,
   reasoning: "medium",
-  // A model that degenerates mid-reply streams until something breaks: one
-  // collapse here produced 127,675 characters of token soup and 2.6 GB of
-  // stream events. These caps stop the next one at a budget instead.
+  // Belt to the per-call cap's braces: stops a session that keeps calling.
   limits: {
-    maxOutputTokensPerSession: 20_000,
+    maxOutputTokensPerSession: 60_000,
     maxInputTokensPerSession: 400_000,
   },
 });
