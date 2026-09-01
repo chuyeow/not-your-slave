@@ -9,4 +9,11 @@ export default defineAgent({
   // Not in the AI Gateway catalog, so eve can't look the window up itself.
   modelContextWindowTokens: 1_310_720,
   reasoning: "medium",
+  // A model that degenerates mid-reply streams until something breaks: one
+  // collapse here produced 127,675 characters of token soup and 2.6 GB of
+  // stream events. These caps stop the next one at a budget instead.
+  limits: {
+    maxOutputTokensPerSession: 20_000,
+    maxInputTokensPerSession: 400_000,
+  },
 });
