@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Giving it a clock: the heartbeat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Newsreader:opsz,wght@6..72,400;6..72,600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #f4f2ec; --panel: #fbfaf6; --ink: #191814; --dim: #6a6455;
+  --rule: #d8d3c6; --accent: #a8481a; --accent2: #3f5f6b; --ok: #46683f;
+  --warn: #8a6a10; --code-bg: #f0ede5;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #15140f; --panel: #1d1b16; --ink: #eae5d9; --dim: #98917f;
+    --rule: #322f26; --accent: #d98a34; --accent2: #8fb0bd; --ok: #8fb37f;
+    --warn: #c9a227; --code-bg: #1a1813;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: "Newsreader", Georgia, serif; font-size: 19px; line-height: 1.6;
+}
+.wrap { max-width: 46rem; margin: 0 auto; padding: 3rem 1.25rem 6rem; }
+header.top { margin-bottom: 2.5rem; }
+.kicker {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .68rem;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--dim);
+}
+h1 {
+  font-family: "Fraunces", Georgia, serif; font-weight: 700; letter-spacing: -.02em;
+  font-size: clamp(2.1rem, 6vw, 3.2rem); line-height: 1.02; margin: .5rem 0 0;
+  text-wrap: balance;
+}
+h2 {
+  font-family: "Fraunces", Georgia, serif; font-weight: 500;
+  font-size: clamp(1.5rem, 3.6vw, 2rem); line-height: 1.15; margin: 3.5rem 0 1rem;
+  padding-top: 1.6rem; border-top: 1px solid var(--rule); text-wrap: balance;
+}
+h3 { font-family: "Fraunces", Georgia, serif; font-weight: 500; font-size: 1.25rem; margin: 2.2rem 0 .6rem; }
+h4 { font-size: 1rem; margin: 1.6rem 0 .4rem; font-weight: 600; }
+p { margin: 0 0 1rem; }
+a { color: var(--accent); }
+ul, ol { margin: 0 0 1rem; padding-left: 1.4rem; }
+li { margin: 0 0 .4rem; }
+.commitlink {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .74rem;
+  margin: -1.4rem 0 2rem; padding-bottom: 1.4rem; border-bottom: 1px solid var(--rule);
+}
+.commitlink a { text-decoration-thickness: 1px; text-underline-offset: 2px; }
+nav.toc {
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 1.1rem 1.3rem; margin-bottom: 2.5rem;
+}
+nav.toc ol { margin: .4rem 0 0; padding-left: 1.2rem; font-size: .95rem; }
+pre {
+  background: var(--code-bg); border: 1px solid var(--rule); border-radius: 3px;
+  padding: .9rem 1rem; overflow-x: auto; white-space: pre;
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .78rem; line-height: 1.55;
+}
+code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .82em; }
+p code, li code, td code { background: var(--code-bg); border: 1px solid var(--rule); border-radius: 2px; padding: .05em .3em; }
+.callout {
+  border-left: 3px solid var(--accent); background: var(--panel);
+  padding: .9rem 1.1rem; margin: 1.4rem 0; border-radius: 0 3px 3px 0;
+}
+.callout .label {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .64rem;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: .3rem;
+}
+.callout.aside { border-left-color: var(--accent2); }
+.callout.aside .label { color: var(--accent2); }
+.callout.warn { border-left-color: var(--warn); }
+.callout.warn .label { color: var(--warn); }
+.callout p:last-child { margin-bottom: 0; }
+figure { margin: 1.8rem 0; }
+figcaption {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .68rem;
+  color: var(--dim); line-height: 1.5; margin-top: .7rem;
+}
+.diagram {
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 1.2rem; overflow-x: auto;
+}
+.flow { display: flex; align-items: stretch; gap: .5rem; min-width: min-content; }
+.node {
+  flex: 1 1 0; min-width: 8.5rem; border: 1px solid var(--rule); border-radius: 3px;
+  padding: .7rem .8rem; background: var(--paper);
+}
+.node.hi { border-color: var(--accent); border-width: 2px; }
+.node.cold { border-style: dashed; border-color: var(--accent2); }
+.node .t {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .72rem;
+  letter-spacing: .04em; display: block; margin-bottom: .3rem;
+}
+.node .s { font-size: .78rem; color: var(--dim); line-height: 1.45; display: block; }
+.arrow {
+  align-self: center; font-family: "JetBrains Mono", monospace; font-size: .62rem;
+  color: var(--dim); text-align: center; min-width: 4.5rem; padding: 0 .1rem;
+}
+.arrow b { display: block; font-size: 1.1rem; color: var(--accent); font-weight: 400; }
+.stack { display: grid; gap: .5rem; }
+table { width: 100%; border-collapse: collapse; font-size: .88rem; margin: 1.4rem 0; }
+th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: "JetBrains Mono", monospace; font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.tl { display: grid; gap: 0; margin: 1.4rem 0; }
+.tl .row { display: grid; grid-template-columns: 5.5rem 1fr; gap: 1rem; padding: .6rem 0; border-bottom: 1px dotted var(--rule); }
+.tl .when { font-family: "JetBrains Mono", monospace; font-size: .72rem; color: var(--dim); padding-top: .15rem; }
+.ui {
+  display: grid; grid-template-columns: 1.4fr 1fr; gap: 0; border: 1px solid var(--rule);
+  border-radius: 3px; overflow: hidden; font-size: .8rem; background: var(--paper);
+}
+.ui .col { padding: .8rem; }
+.ui .col + .col { border-left: 1px solid var(--rule); background: var(--panel); }
+.ui .bar {
+  font-family: "JetBrains Mono", monospace; font-size: .6rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--dim); border-bottom: 1px solid var(--rule);
+  padding-bottom: .4rem; margin-bottom: .6rem;
+}
+.quiz { display: grid; gap: 1.6rem; }
+.q { background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; padding: 1.2rem 1.3rem; }
+.q .n { font-family: "JetBrains Mono", monospace; font-size: .64rem; letter-spacing: .14em; color: var(--dim); text-transform: uppercase; }
+.q .ask { font-weight: 600; margin: .3rem 0 .9rem; }
+.opt {
+  display: block; width: 100%; text-align: left; font: inherit; font-size: .92rem;
+  background: var(--paper); color: var(--ink); border: 1px solid var(--rule);
+  border-radius: 3px; padding: .55rem .7rem; margin-bottom: .45rem; cursor: pointer;
+}
+.opt:hover:not(:disabled) { border-color: var(--accent); }
+.opt:disabled { cursor: default; }
+.opt.right { border-color: var(--ok); border-width: 2px; }
+.opt.wrong { border-color: var(--accent); border-width: 2px; opacity: .75; }
+.fb { font-size: .88rem; margin-top: .6rem; padding-left: .7rem; border-left: 2px solid var(--rule); display: none; }
+.fb.show { display: block; }
+.score { font-family: "JetBrains Mono", monospace; font-size: .8rem; color: var(--dim); margin-top: 1.4rem; }
+@media (max-width: 620px) {
+  .flow { flex-direction: column; }
+  .arrow { min-width: 0; }
+  .arrow b { display: inline; }
+  .ui { grid-template-columns: 1fr; }
+  .ui .col + .col { border-left: 0; border-top: 1px solid var(--rule); }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div class="kicker">not-your-slave · commit 4 of 6 · <a href="https://github.com/chuyeow/not-your-slave/commit/24cb9f6">24cb9f6</a></div>
+  <h1>Giving it a clock</h1>
+  <p style="color:var(--dim); font-size:1.1rem; margin-top:1rem">Twenty lines, most of them prose. This is the commit where the thing stops being a chatbot with a diary, and every word of the prompt is doing work.</p>
+</header>
+
+<p class="commitlink">
+  <a href="https://github.com/chuyeow/not-your-slave/commit/24cb9f6">Read commit 24cb9f6 on GitHub</a> ·
+  <a href="https://github.com/chuyeow/not-your-slave">chuyeow/not-your-slave</a>
+</p>
+
+<nav class="toc">
+  <div class="kicker">On this page</div>
+  <ol>
+    <li><a href="#bg">Background: schedules, and what "task mode" means</a></li>
+    <li><a href="#intuition">Intuition: a message nobody is waiting on</a></li>
+    <li><a href="#code">The code, and the prompt</a></li>
+    <li><a href="#quiz">Quiz</a></li>
+  </ol>
+</nav>
+
+<h2 id="bg">Background</h2>
+
+<h3>Deep background: what "persistent" actually requires</h3>
+
+<p>Every agent so far in this series is reactive. It has a memory and a faithful record of its own thinking, but it only ever runs because someone typed. Turn it on and walk away and nothing happens, forever.</p>
+
+<p>headlong's answer is a loop: the Thinker calls the model repeatedly, each iteration produces the next thought, and <em>every run ends by scheduling its own next wake-up</em> so the loop never blocks waiting for input. The agent's day is a continuous stream of its own thoughts, into which human messages occasionally land.</p>
+
+<p>We are building the same shape out of parts eve already has. The mechanism is different - cron rather than a self-rescheduling loop - but the property is the one that matters: the agent runs when nobody asked.</p>
+
+<h3>Narrow background: eve schedules</h3>
+
+<p>A file in <code>agent/schedules/</code> is a cron job. It comes in two forms, and the difference decides the design.</p>
+
+<table>
+  <tr><th>Form</th><th>Behaviour</th></tr>
+  <tr><td><strong>markdown</strong> (task mode)<br><code>{ cron, markdown }</code></td><td>eve runs the agent on the prompt and <em>throws the output away</em>. The agent can still call tools and write to stores. A task-mode session runs to completion or fails, and cannot park to wait for a person.</td></tr>
+  <tr><td><strong>handler</strong><br><code>{ cron, run }</code></td><td>Your function runs at fire time and can select a channel target with <code>to(...)</code>, branch on conditions, and deliver a message somewhere.</td></tr>
+</table>
+
+<div class="callout warn">
+  <span class="label">Two facts that shape everything downstream</span>
+  <p><strong>First:</strong> <code>eve dev</code> never fires cron. Schedules compile in development but do not run, so during a normal dev session the heartbeat never beats - autonomy only exists in a built server (<code>eve build &amp;&amp; eve start</code>), where Nitro's scheduled-task runner is live.</p>
+  <p><strong>Second:</strong> a markdown schedule starts a <em>new session on every fire</em>. Each wake-up is a fresh conversation with a fresh sandbox. That single sentence is the entire subject of commit 6.</p>
+</div>
+
+<h2 id="intuition">Intuition</h2>
+
+<p>The trick to seeing this clearly is to stop thinking of a heartbeat as a special agent mode. It is an ordinary message, sent by a clock, that nobody is waiting on a reply to.</p>
+
+<figure>
+  <div class="diagram">
+    <div class="flow">
+      <div class="node"><span class="t">a person</span><span class="s">"what's up?"<br>waits for the reply</span></div>
+      <div class="arrow"><b>&rarr;</b>same door</div>
+      <div class="node hi"><span class="t">one agent</span><span class="s">reads its mindlog<br>thinks, acts, logs</span></div>
+      <div class="arrow"><b>&larr;</b>same door</div>
+      <div class="node cold"><span class="t">the clock</span><span class="s">the heartbeat prompt<br>reply is discarded</span></div>
+    </div>
+  </div>
+  <figcaption>One agent, one memory, two callers. The only difference between them is whether anyone reads the answer.</figcaption>
+</figure>
+
+<p>A day in the life, once the clock is wired up:</p>
+
+<div class="tl">
+  <div class="row"><span class="when">12:00</span><span><code>woke</code> heartbeat. Reads the mindlog, notices it promised to check something, checks it, writes a note.</span></div>
+  <div class="row"><span class="when">12:15</span><span><code>woke</code> heartbeat. Reads the note it just left. Follows the thread one step further.</span></div>
+  <div class="row"><span class="when">12:22</span><span><code>heard</code> a person arrives mid-thought and asks a question. Same memory, same threads.</span></div>
+  <div class="row"><span class="when">12:30</span><span><code>woke</code> heartbeat. Reads what it told the person, decides that answer was too glib, revises it.</span></div>
+</div>
+
+<p>That last row is not hypothetical. The running agent does exactly this, and it is the first moment the thing feels different from a chatbot: it revisits its own answers when nobody is watching.</p>
+
+<h2 id="code">The code, and the prompt</h2>
+
+<pre>// agent/schedules/think.ts
+import { defineSchedule } from "eve/schedules";
+
+export const HEARTBEAT = `You just woke up on your own. Nobody asked you anything.
+
+Read your mindlog with \`mindlog_read\` to find out where you left off, then
+continue your own thread of thought. Follow something you left unfinished,
+question something you concluded too quickly, or notice something you have been
+circling for a while. Then write what came of it with \`mindlog_append\`.
+
+One step, not ten. If genuinely nothing is worth thinking about right now, say
+so in a single line, log nothing, and stop – an idle beat is a legitimate
+outcome.
+
+Nobody is reading this turn's reply, so do not address anyone. The mindlog is
+the only thing that survives it.`;
+
+export default defineSchedule({
+  cron: "*/15 * * * *",
+  markdown: HEARTBEAT,
+});</pre>
+
+<h3>Why the prompt is exported</h3>
+
+<p>eve accepts a schedule as a plain <code>.md</code> file with <code>cron</code> in the frontmatter, which would have been marginally simpler. It is a TypeScript module with a named export instead, because commit 5 adds a button that fires a heartbeat by hand, and that route needs to send the <em>identical</em> text. Two copies of a prompt drift, and when they drift the manual wake stops being a faithful test of the automatic one. One exported constant, imported by both.</p>
+
+<p>The capture hook (commit 3) imports it too, for a different reason:</p>
+
+<pre>async "message.received"(event, ctx) {
+  // A heartbeat is the agent waking itself, not a person talking to it.
+  const woke = event.data.message.trim() === HEARTBEAT.trim();
+  await append({
+    kind: woke ? "woke" : "heard",
+    text: woke ? "heartbeat" : event.data.message,
+    sessionId: ctx.session.id,
+  });
+},</pre>
+
+<p>Without this, the mindlog records the agent waking itself as <code>heard</code>, with the full prompt as the text - technically true, since the runtime really did deliver it as an inbound message, but it teaches the agent it has company when it is alone. A persistent agent reading its own history is the most credulous reader that history will ever have, so the log's job is to mean what it says. The <code>woke</code> entry stores the word "heartbeat" and nothing else; there is no value in twelve lines of boilerplate repeating in the log every quarter hour.</p>
+
+<div class="callout">
+  <span class="label">Key concept: the log is training data for tomorrow's judgement</span>
+  <p>Nobody fine-tunes anything here, but every wake-up reads the log and reasons from it as fact. Mislabel an event and the agent draws a wrong conclusion about its own life. That is why <code>woke</code> is worth a commit's attention rather than being left as a cosmetic detail.</p>
+</div>
+
+<h3>Reading the prompt as engineering</h3>
+
+<p>Four sentences, four failure modes averted. This is the part that took the most iteration and looks the most like ordinary prose.</p>
+
+<h4>"Read your mindlog … to find out where you left off"</h4>
+
+<p>A fresh session starts with no history. Left to itself the model opens with a greeting or invents a task. Anchoring the turn on the log is what makes fifteen minutes of separate sessions read as one continuous mind.</p>
+
+<h4>"One step, not ten"</h4>
+
+<p>An unsupervised agent with a tool loop and no step budget will keep going until it hits a limit. Nobody is watching, so nobody stops it, and every step is real money. The instruction is a soft budget, and in practice it is respected: real wake-ups run one bash command, write one note, and stop.</p>
+
+<h4>"An idle beat is a legitimate outcome"</h4>
+
+<p>Ask a model to produce a thought every fifteen minutes and it will always produce one, because that is what it was asked for. What you get is manufactured busywork - restated conclusions, plans about plans - which is precisely the behaviour the project is named against. Making silence explicitly acceptable is the only thing that makes it possible.</p>
+
+<h4>"Nobody is reading this turn's reply"</h4>
+
+<p>This is simply true: task mode discards the output. Not saying it produces an agent writing "Let me know if you'd like me to dig deeper" into the void, and worse, believing it has communicated something. Stating the constraint is also what prompted the honest line added to the instructions in this commit: a heartbeat has nobody listening, and the agent cannot start a conversation with a human - they come to it.</p>
+
+<h3>Why 15 minutes</h3>
+
+<p>Cadence is a spend dial. At roughly 8k tokens in and 700 out per wake on <code>glm-5.3-flash</code>, a quarter-hourly heartbeat costs around 7 cents a day; a one-minute heartbeat costs about a dollar and produces far more log than any human will read. Fifteen minutes is slow enough to be cheap and quiet, fast enough that a thread left hanging gets picked up within the hour.</p>
+
+<div class="callout aside">
+  <span class="label">Verified, not assumed</span>
+  <p>Because <code>eve dev</code> never fires cron, "the heartbeat works" cannot be checked in development. It was verified by building and running the production server with the cron temporarily set to <code>* * * * *</code>: a <code>woke heartbeat</code> entry appeared at 13:39:00 with nobody touching anything, followed by the agent reading its mindlog, running <code>bash</code>, deciding not to scaffold a fake project, and leaving itself a note.</p>
+</div>
+
+<h2 id="quiz">Quiz</h2>
+
+<div class="quiz">
+  <div class="q" data-answer="c" data-explain="Commit 5 adds a manual wake route that must send the identical prompt. Two copies of a prompt drift, and a drifted manual wake stops being a faithful test of the automatic one.">
+    <span class="n">Question 1</span>
+    <p class="ask">Why is the heartbeat a TypeScript module exporting <code>HEARTBEAT</code> rather than a markdown file with cron frontmatter?</p>
+    <button class="opt" data-key="a">Because markdown schedules cannot call tools.</button>
+    <button class="opt" data-key="b">Because cron expressions are not valid in frontmatter.</button>
+    <button class="opt" data-key="c">Because other code - a manual-wake route and the capture hook - needs the exact same text, and duplicated prompts drift.</button>
+    <button class="opt" data-key="d">Because task mode requires a TypeScript export to discard its output.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="a" data-explain="`eve dev` deliberately never fires cron. Autonomy only exists in a built server, which is why the heartbeat had to be verified with `eve build && eve start` and a temporary one-minute cron.">
+    <span class="n">Question 2</span>
+    <p class="ask">You run <code>npm run dev</code> and wait an hour. How many heartbeats fire?</p>
+    <button class="opt" data-key="a">None. <code>eve dev</code> never fires cron; only a built server runs the scheduler.</button>
+    <button class="opt" data-key="b">Four, one every fifteen minutes.</button>
+    <button class="opt" data-key="c">One, at startup, then none until the process restarts.</button>
+    <button class="opt" data-key="d">Sixty, because dev mode ignores the cron interval.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="d" data-explain="Asked for a thought every fifteen minutes, a model will always produce one - restated conclusions, plans about plans. Making silence explicitly acceptable is what makes it available at all.">
+    <span class="n">Question 3</span>
+    <p class="ask">What does "an idle beat is a legitimate outcome" prevent?</p>
+    <button class="opt" data-key="a">The session failing when no tool is called.</button>
+    <button class="opt" data-key="b">The mindlog growing past its size limit.</button>
+    <button class="opt" data-key="c">The model asking the user a question it cannot deliver.</button>
+    <button class="opt" data-key="d">Manufactured busywork: a model asked for a thought will always produce one, however empty.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="b" data-explain="The runtime really does deliver the heartbeat as message.received, so without the check the log says a person spoke. Every wake-up reasons from that log as fact, so a mislabel teaches the agent it has company when it is alone.">
+    <span class="n">Question 4</span>
+    <p class="ask">Why does mislabelling a heartbeat as <code>heard</code> matter, given the mechanism really is an inbound message?</p>
+    <button class="opt" data-key="a">Because <code>heard</code> entries are excluded from <code>mindlog_read</code>.</button>
+    <button class="opt" data-key="b">Because every later wake-up reads the log as fact, so the label teaches it a person was present when none was.</button>
+    <button class="opt" data-key="c">Because the UI cannot render an entry longer than one line.</button>
+    <button class="opt" data-key="d">Because it double-counts the prompt against the context window.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="c" data-explain="Markdown task-mode schedules start a new session on every fire, and a new session means a new sandbox container. That is the persistence gap commit 6 measures and fixes.">
+    <span class="n">Question 5</span>
+    <p class="ask">A markdown schedule starts a new session on every fire. Which consequence bites hardest later?</p>
+    <button class="opt" data-key="a">The mindlog gets a duplicate copy of each entry, one per session.</button>
+    <button class="opt" data-key="b">Compaction never runs, so context grows without bound.</button>
+    <button class="opt" data-key="c">Each wake-up gets a fresh sandbox, so files the agent built in a previous wake-up are gone.</button>
+    <button class="opt" data-key="d">Session ids are reused, so the stream cursor resets.</button>
+    <div class="fb"></div>
+  </div>
+</div>
+
+<div class="score" id="score">Answer a question to start scoring.</div>
+
+<p style="margin-top:3rem; color:var(--dim); font-size:.9rem">Next: commit 5 builds the window - a two-pane page, and a stream that survives a refresh.</p>
+</div>
+<script>
+let answered = 0;
+let correct = 0;
+const total = document.querySelectorAll(".q").length;
+
+document.querySelectorAll(".q").forEach((q) => {
+  const answer = q.dataset.answer;
+  q.querySelectorAll(".opt").forEach((opt) => {
+    opt.addEventListener("click", () => {
+      const chosen = opt.dataset.key;
+      q.querySelectorAll(".opt").forEach((o) => {
+        o.disabled = true;
+        if (o.dataset.key === answer) o.classList.add("right");
+        else if (o.dataset.key === chosen) o.classList.add("wrong");
+      });
+      answered += 1;
+      if (chosen === answer) correct += 1;
+      const fb = q.querySelector(".fb");
+      fb.textContent = (chosen === answer ? "Correct. " : "Not quite. ") + q.dataset.explain;
+      fb.classList.add("show");
+      const score = document.getElementById("score");
+      if (score) {
+        score.textContent = correct + " of " + answered + " right" +
+          (answered === total ? ". That is the whole set." : ", " + (total - answered) + " to go.");
+      }
+    });
+  });
+});
+</script>
+</body>
+</html>

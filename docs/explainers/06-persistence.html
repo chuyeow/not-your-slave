@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What actually survives: closing the persistence gap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Newsreader:opsz,wght@6..72,400;6..72,600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #f4f2ec; --panel: #fbfaf6; --ink: #191814; --dim: #6a6455;
+  --rule: #d8d3c6; --accent: #a8481a; --accent2: #3f5f6b; --ok: #46683f;
+  --warn: #8a6a10; --code-bg: #f0ede5;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #15140f; --panel: #1d1b16; --ink: #eae5d9; --dim: #98917f;
+    --rule: #322f26; --accent: #d98a34; --accent2: #8fb0bd; --ok: #8fb37f;
+    --warn: #c9a227; --code-bg: #1a1813;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: "Newsreader", Georgia, serif; font-size: 19px; line-height: 1.6;
+}
+.wrap { max-width: 46rem; margin: 0 auto; padding: 3rem 1.25rem 6rem; }
+header.top { margin-bottom: 2.5rem; }
+.kicker {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .68rem;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--dim);
+}
+h1 {
+  font-family: "Fraunces", Georgia, serif; font-weight: 700; letter-spacing: -.02em;
+  font-size: clamp(2.1rem, 6vw, 3.2rem); line-height: 1.02; margin: .5rem 0 0;
+  text-wrap: balance;
+}
+h2 {
+  font-family: "Fraunces", Georgia, serif; font-weight: 500;
+  font-size: clamp(1.5rem, 3.6vw, 2rem); line-height: 1.15; margin: 3.5rem 0 1rem;
+  padding-top: 1.6rem; border-top: 1px solid var(--rule); text-wrap: balance;
+}
+h3 { font-family: "Fraunces", Georgia, serif; font-weight: 500; font-size: 1.25rem; margin: 2.2rem 0 .6rem; }
+h4 { font-size: 1rem; margin: 1.6rem 0 .4rem; font-weight: 600; }
+p { margin: 0 0 1rem; }
+a { color: var(--accent); }
+ul, ol { margin: 0 0 1rem; padding-left: 1.4rem; }
+li { margin: 0 0 .4rem; }
+.commitlink {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .74rem;
+  margin: -1.4rem 0 2rem; padding-bottom: 1.4rem; border-bottom: 1px solid var(--rule);
+}
+.commitlink a { text-decoration-thickness: 1px; text-underline-offset: 2px; }
+nav.toc {
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 1.1rem 1.3rem; margin-bottom: 2.5rem;
+}
+nav.toc ol { margin: .4rem 0 0; padding-left: 1.2rem; font-size: .95rem; }
+pre {
+  background: var(--code-bg); border: 1px solid var(--rule); border-radius: 3px;
+  padding: .9rem 1rem; overflow-x: auto; white-space: pre;
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .78rem; line-height: 1.55;
+}
+code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .82em; }
+p code, li code, td code { background: var(--code-bg); border: 1px solid var(--rule); border-radius: 2px; padding: .05em .3em; }
+.callout {
+  border-left: 3px solid var(--accent); background: var(--panel);
+  padding: .9rem 1.1rem; margin: 1.4rem 0; border-radius: 0 3px 3px 0;
+}
+.callout .label {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .64rem;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: .3rem;
+}
+.callout.aside { border-left-color: var(--accent2); }
+.callout.aside .label { color: var(--accent2); }
+.callout.warn { border-left-color: var(--warn); }
+.callout.warn .label { color: var(--warn); }
+.callout p:last-child { margin-bottom: 0; }
+figure { margin: 1.8rem 0; }
+figcaption {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .68rem;
+  color: var(--dim); line-height: 1.5; margin-top: .7rem;
+}
+.diagram {
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 1.2rem; overflow-x: auto;
+}
+.flow { display: flex; align-items: stretch; gap: .5rem; min-width: min-content; }
+.node {
+  flex: 1 1 0; min-width: 8.5rem; border: 1px solid var(--rule); border-radius: 3px;
+  padding: .7rem .8rem; background: var(--paper);
+}
+.node.hi { border-color: var(--accent); border-width: 2px; }
+.node.cold { border-style: dashed; border-color: var(--accent2); }
+.node .t {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .72rem;
+  letter-spacing: .04em; display: block; margin-bottom: .3rem;
+}
+.node .s { font-size: .78rem; color: var(--dim); line-height: 1.45; display: block; }
+.arrow {
+  align-self: center; font-family: "JetBrains Mono", monospace; font-size: .62rem;
+  color: var(--dim); text-align: center; min-width: 4.5rem; padding: 0 .1rem;
+}
+.arrow b { display: block; font-size: 1.1rem; color: var(--accent); font-weight: 400; }
+.stack { display: grid; gap: .5rem; }
+table { width: 100%; border-collapse: collapse; font-size: .88rem; margin: 1.4rem 0; }
+th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: "JetBrains Mono", monospace; font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.tl { display: grid; gap: 0; margin: 1.4rem 0; }
+.tl .row { display: grid; grid-template-columns: 5.5rem 1fr; gap: 1rem; padding: .6rem 0; border-bottom: 1px dotted var(--rule); }
+.tl .when { font-family: "JetBrains Mono", monospace; font-size: .72rem; color: var(--dim); padding-top: .15rem; }
+.ui {
+  display: grid; grid-template-columns: 1.4fr 1fr; gap: 0; border: 1px solid var(--rule);
+  border-radius: 3px; overflow: hidden; font-size: .8rem; background: var(--paper);
+}
+.ui .col { padding: .8rem; }
+.ui .col + .col { border-left: 1px solid var(--rule); background: var(--panel); }
+.ui .bar {
+  font-family: "JetBrains Mono", monospace; font-size: .6rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--dim); border-bottom: 1px solid var(--rule);
+  padding-bottom: .4rem; margin-bottom: .6rem;
+}
+.quiz { display: grid; gap: 1.6rem; }
+.q { background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; padding: 1.2rem 1.3rem; }
+.q .n { font-family: "JetBrains Mono", monospace; font-size: .64rem; letter-spacing: .14em; color: var(--dim); text-transform: uppercase; }
+.q .ask { font-weight: 600; margin: .3rem 0 .9rem; }
+.opt {
+  display: block; width: 100%; text-align: left; font: inherit; font-size: .92rem;
+  background: var(--paper); color: var(--ink); border: 1px solid var(--rule);
+  border-radius: 3px; padding: .55rem .7rem; margin-bottom: .45rem; cursor: pointer;
+}
+.opt:hover:not(:disabled) { border-color: var(--accent); }
+.opt:disabled { cursor: default; }
+.opt.right { border-color: var(--ok); border-width: 2px; }
+.opt.wrong { border-color: var(--accent); border-width: 2px; opacity: .75; }
+.fb { font-size: .88rem; margin-top: .6rem; padding-left: .7rem; border-left: 2px solid var(--rule); display: none; }
+.fb.show { display: block; }
+.score { font-family: "JetBrains Mono", monospace; font-size: .8rem; color: var(--dim); margin-top: 1.4rem; }
+@media (max-width: 620px) {
+  .flow { flex-direction: column; }
+  .arrow { min-width: 0; }
+  .arrow b { display: inline; }
+  .ui { grid-template-columns: 1fr; }
+  .ui .col + .col { border-left: 0; border-top: 1px solid var(--rule); }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div class="kicker">not-your-slave · commit 6 of 6 · <a href="https://github.com/chuyeow/not-your-slave/commit/054ea75">054ea75</a></div>
+  <h1>What actually survives: closing the persistence gap</h1>
+  <p style="color:var(--dim); font-size:1.1rem; margin-top:1rem">One hook, one tool. The work here was not the code, it was measuring what was broken precisely enough that the fix could be small.</p>
+</header>
+
+<p class="commitlink">
+  <a href="https://github.com/chuyeow/not-your-slave/commit/054ea75">Read commit 054ea75 on GitHub</a> ·
+  <a href="https://github.com/chuyeow/not-your-slave">chuyeow/not-your-slave</a>
+</p>
+
+<nav class="toc">
+  <div class="kicker">On this page</div>
+  <ol>
+    <li><a href="#bg">Background: three filesystems, one agent</a></li>
+    <li><a href="#intuition">Intuition: what a wipe takes</a></li>
+    <li><a href="#measure">The measurement</a></li>
+    <li><a href="#code">The code</a></li>
+    <li><a href="#quiz">Quiz</a></li>
+  </ol>
+</nav>
+
+<h2 id="bg">Background</h2>
+
+<h3>Deep background: where an agent's shell actually runs</h3>
+
+<p>Give a model a <code>bash</code> tool and the immediate question is whose machine it runs on. eve's answer is a sandbox: an isolated environment rooted at <code>/workspace</code>, with a backend chosen by availability - Vercel Sandbox when deployed on Vercel, otherwise Docker if a daemon is reachable, otherwise a lightweight local VM, otherwise a pure-JS Bash interpreter.</p>
+
+<p>On this machine it resolves to Docker, and the isolation is worth stating in the concrete terms it was checked in, because the alternative is trusting a diagram:</p>
+
+<pre>$ docker inspect &lt;sandbox&gt; --format 'Mounts: {{json .Mounts}} …'
+Mounts: []
+Network: bridge
+Privileged: false
+CapAdd: null
+
+# and from inside the container:
+$ hostname; whoami; ls /Users
+e91edb4887c0
+vercel-sandbox
+ls: cannot access '/Users': No such file or directory</pre>
+
+<p>No mounts, no privileges, no host filesystem. The agent's shell cannot read your home directory, your repo, or your keys. It does have open network egress, which is a separate conversation and one line of policy to change.</p>
+
+<div class="callout">
+  <span class="label">Key concept: two filesystems, two trust levels</span>
+  <p>Authored <strong>tools and hooks run in the app process</strong>, as you, with your environment and your disk. The <strong>model's shell runs in the container</strong>, with neither. That asymmetry is the whole security model: <code>mindlog_append</code> is safe on your disk because its schema exposes no path, while <code>bash</code> is safe because it is somewhere else entirely.</p>
+</div>
+
+<h3>Narrow background: three places state can live</h3>
+
+<table>
+  <tr><th>Place</th><th>Lifetime</th></tr>
+  <tr><td><code>.data/mindlog.jsonl</code> on the host</td><td>Forever, until you delete it.</td></tr>
+  <tr><td><code>.eve/.workflow-data/</code> on the host</td><td>Sessions, turns and every stream event. Wiped when you clear it, and you will want to.</td></tr>
+  <tr><td><code>/workspace</code> in the container</td><td>Persists across turns <em>within one session</em>. Gone when the session ends.</td></tr>
+</table>
+
+<p>That third row is the gap. Commit 4 established that a markdown schedule starts a new session on every fire, and now those two facts meet.</p>
+
+<h2 id="intuition">Intuition</h2>
+
+<figure>
+  <div class="diagram">
+    <div class="flow">
+      <div class="node cold">
+        <span class="t">wake-up at 12:00</span>
+        <span class="s">fresh container<br>writes /workspace/plan.py<br>logs a note</span>
+      </div>
+      <div class="arrow"><b>&rarr;</b>files: no<br>text: yes</div>
+      <div class="node cold">
+        <span class="t">wake-up at 12:15</span>
+        <span class="s">another fresh container<br><em>plan.py: not found</em><br>reads the note</span>
+      </div>
+    </div>
+  </div>
+  <figcaption>Before this commit. The agent could describe what it built, then find it gone, so it re-described it. The mindlog even contains it noticing this about itself.</figcaption>
+</figure>
+
+<p>Two candidate fixes, and the choice between them is about whose problem it is.</p>
+
+<ul>
+  <li><strong>Give the agent host-folder tools</strong> - a <code>keep_file</code> / <code>read_kept</code> pair writing to <code>.data/workspace/</code>. Ten minutes of work. It also gives the agent two filesystems and a rule to remember, and it will forget, because remembering to copy your work into the durable drive is exactly the kind of bookkeeping commit 3 already established a model will skip.</li>
+  <li><strong>Sync at the session boundary</strong> - restore on start, snapshot on park. More code, in one place, and the agent's mental model stays "I use bash on <code>/workspace</code>". Nothing to remember, so nothing to forget.</li>
+</ul>
+
+<p>Same reasoning as commit 3: put the mechanism in the runtime rather than in the prompt. The framework's Docker backend exposes image, env, pull policy and network policy - but no volumes - so crossing the boundary means copying bytes, and the cheapest copy of a directory tree is a tarball.</p>
+
+<figure>
+  <div class="diagram">
+    <div class="flow">
+      <div class="node hi"><span class="t">.data/workspace.tgz</span><span class="s">on your disk</span></div>
+      <div class="arrow"><b>&rarr;</b>session.started<br>tar xzf</div>
+      <div class="node cold"><span class="t">/workspace</span><span class="s">in the container<br>the agent works here</span></div>
+      <div class="arrow"><b>&rarr;</b>session.waiting<br>tar czf</div>
+      <div class="node hi"><span class="t">.data/workspace.tgz</span><span class="s">back on your disk</span></div>
+    </div>
+  </div>
+  <figcaption>The same hook also drops a fresh copy of the mindlog into <code>/workspace</code>, which is the second gap closed for free.</figcaption>
+</figure>
+
+<h2 id="measure">The measurement</h2>
+
+<p>Both the gap and the fix were measured rather than reasoned about, and the evidence is worth reproducing because it is what makes the claims checkable.</p>
+
+<h4>The gap, in dev</h4>
+
+<div class="tl">
+  <div class="row"><span class="when">session A</span><span>Container <code>75163c939ecd</code>. Writes <code>/workspace/probe.txt</code>. <code>ls</code> confirms it.</span></div>
+  <div class="row"><span class="when">session B</span><span>Container <code>f913169e11bd</code>. <code>cat /workspace/probe.txt</code> → <em>No such file or directory</em>. <code>/workspace</code> empty.</span></div>
+</div>
+
+<h4>The gap, under real cron</h4>
+
+<p>A temporary schedule at <code>* * * * *</code>, whose prompt appended a line to a file and reported the count:</p>
+
+<pre>07:08:03  FIRES=1  container 5804840ac060  session …TSK950
+07:09:11  FIRES=2  container 0d89c9f5b6e1  session …MCSF0M</pre>
+
+<p>Two fires, two sessions, two containers. Before the hook the second fire found no file at all; the run above is <em>after</em>, and the hook's own log lines are the other half of the evidence:</p>
+
+<pre>[workspace-sync] wrun_…TSK950  nothing kept yet
+[workspace-sync] wrun_…TSK950  kept 163 bytes
+[workspace-sync] wrun_…MCSF0M  restored 163 bytes
+[workspace-sync] wrun_…MCSF0M  kept 170 bytes</pre>
+
+<div class="callout aside">
+  <span class="label">An asymmetry this exposed</span>
+  <p>The Wake it button and cron are not equivalent. The button posts to a channel address, so repeated presses reuse one long-lived session and its container - files survived between manual wakes even before this commit. Cron creates a new session each fire. Testing autonomy through the button would therefore have shown the gap as already fixed, which is exactly the sort of false green a production-mode test catches.</p>
+</div>
+
+<h4>What else was found while looking</h4>
+
+<p>Counting what is stored turned up something unrelated and worse: <code>.eve/.workflow-data/streams</code> had grown to <strong>2.6 GB</strong>, of which 2.57 GB belonged to one session - 31,435 chunks averaging 86 KB. The cause is the cumulative-delta design from commit 5: every <code>message.appended</code> stores the whole message so far, so a long reply is persisted repeatedly at growing length. It is framework behaviour, not a bug in this code, and it is almost certainly what OOM-killed the dev server earlier in the session at a 4 GB heap. The practical consequence is that wiping <code>.eve/</code> becomes routine - which is precisely why it matters that the mindlog and the workspace archive live somewhere else.</p>
+
+<h2 id="code">The code</h2>
+
+<pre>const ARCHIVE = process.env.WORKSPACE_ARCHIVE ?? ".data/workspace.tgz";
+const SANDBOX_ARCHIVE = "/tmp/workspace-sync.tgz";
+const MINDLOG_COPY = "/workspace/mindlog.jsonl";
+
+async function restore(sandbox: SandboxSession): Promise&lt;string&gt; {
+  let archive: Uint8Array;
+  try { archive = await readFile(ARCHIVE); } catch { return "nothing kept yet"; }
+
+  await sandbox.writeBinaryFile({ path: SANDBOX_ARCHIVE, content: archive });
+  const result = await sandbox.run({
+    command: `mkdir -p /workspace &amp;&amp; tar xzf ${SANDBOX_ARCHIVE} -C /workspace &amp;&amp; rm -f ${SANDBOX_ARCHIVE}`,
+  });
+  return result.exitCode === 0 ? `restored ${archive.byteLength} bytes` : `restore failed: ${result.stderr}`;
+}</pre>
+
+<p>Bytes in through the sandbox handle, then <code>tar</code> inside the container does the unpacking. A missing archive is not an error - it is a new agent - and returns a string that the caller logs, which is how the evidence above exists at all.</p>
+
+<pre>async function snapshot(sandbox: SandboxSession): Promise&lt;string&gt; {
+  // Exclude the mindlog copy: the real one lives on the host and is the source
+  // of truth, so keeping a stale copy in the tarball would resurrect old lines.
+  const packed = await sandbox.run({
+    command: `tar czf ${SANDBOX_ARCHIVE} -C /workspace --exclude=./mindlog.jsonl . &amp;&amp; echo ok`,
+  });
+  if (packed.exitCode !== 0) return `pack failed: ${packed.stderr}`;
+
+  const bytes = await sandbox.readBinaryFile({ path: SANDBOX_ARCHIVE });
+  if (bytes === null) return "pack produced nothing";
+
+  await mkdir(dirname(ARCHIVE), { recursive: true });
+  await writeFile(ARCHIVE, bytes);
+  return `kept ${bytes.byteLength} bytes`;
+}</pre>
+
+<p>That <code>--exclude</code> is the subtle line in the commit. Without it the mindlog copy rides along in the tarball and gets unpacked at the start of the next session - and then <code>turn.started</code> overwrites it with the real thing, so the stale copy is harmless <em>this</em> time, and quietly wrong the moment anything reads it before the first turn. Cheaper to never store it.</p>
+
+<pre>export default defineHook({
+  events: {
+    async "session.started"(_event, ctx) {
+      const sandbox = await ctx.getSandbox();
+      const outcome = await restore(sandbox);
+      await refreshMindlogCopy(sandbox);
+      console.info("[workspace-sync]", ctx.session.id, outcome);
+    },
+    async "turn.started"(_event, ctx)   { await refreshMindlogCopy(await ctx.getSandbox()); },
+    async "session.waiting"(_event, ctx)   { console.info("[workspace-sync]", ctx.session.id, await snapshot(await ctx.getSandbox())); },
+    async "session.completed"(_event, ctx) { console.info("[workspace-sync]", ctx.session.id, await snapshot(await ctx.getSandbox())); },
+  },
+});</pre>
+
+<p>Four events. The pair of snapshot points is deliberate: <code>session.waiting</code> fires whenever a turn parks, which is the common case and catches work as soon as it is done, while <code>session.completed</code> catches a session that ends without parking - a task-mode heartbeat, for instance.</p>
+
+<div class="callout warn">
+  <span class="label">The ceiling, named in the source</span>
+  <pre style="margin-top:.6rem">// ponytail: one tarball, last-write-wins. The chat session and a heartbeat both
+// snapshot to the same path, so whoever parks last wins. Per-session tarballs
+// or a real file-level sync if that ever costs anything.</pre>
+  <p style="margin-top:.6rem">Two sessions parking simultaneously means the later one overwrites. At one user and a quarter-hourly heartbeat the window is small; the note exists so the next person does not have to rediscover it in a debugger.</p>
+</div>
+
+<h3>Reading its own memory</h3>
+
+<pre>async function refreshMindlogCopy(sandbox: SandboxSession): Promise&lt;void&gt; {
+  let text: string;
+  try { text = await readFile(MINDLOG_FILE, "utf8"); } catch { return; }
+  await sandbox.writeTextFile({ path: MINDLOG_COPY, content: text });
+}</pre>
+
+<p>Five lines for gap 2. The copy is refreshed at the start of every turn, so <code>grep</code>, <code>jq</code>, <code>wc</code> and any script the agent writes can work over its own history. It is read-only in effect rather than by permission: appends still go through <code>mindlog_append</code>, so a script editing the copy changes nothing durable. Verified from inside the container - <code>wc -l</code> reported 89 lines, <code>grep -c woke</code> reported 5.</p>
+
+<h3>And search</h3>
+
+<pre>export async function search(query: string, limit = 20): Promise&lt;MindlogEntry[]&gt; {
+  const needle = query.toLowerCase();
+  const all = await read(Number.MAX_SAFE_INTEGER);
+  return all.filter((entry) =&gt; entry.text.toLowerCase().includes(needle)).slice(-limit);
+}</pre>
+
+<p>A linear scan, exposed as <code>mindlog_search</code>. Recall until now was "the most recent N entries", which meant last week was invisible - a real limitation for an agent whose whole point is continuity. The implementation is deliberately dumb: at a few thousand entries a substring scan is instant, and the alternative is an index that has to be maintained and can fall out of sync with the file. The agent used it correctly on the first try, returning five matches for "busywork" and identifying the oldest.</p>
+
+<h3>What is still open</h3>
+
+<ul>
+  <li><strong>One copy, no backup.</strong> The mindlog and the archive are gitignored and live on one machine. <code>cp</code> them somewhere.</li>
+  <li><strong>No forgetting.</strong> The log only grows. There is no compaction, no summarisation, no retention policy - headlong's exponential-decay resolution is the obvious next step.</li>
+  <li><strong>Production auth</strong> from commit 5, unchanged and deliberate.</li>
+</ul>
+
+<h2 id="quiz">Quiz</h2>
+
+<div class="quiz">
+  <div class="q" data-answer="c" data-explain="eve's docker backend exposes image, env, pull policy and network policy, but no volumes - so no host directory can be mounted into the container. Crossing the boundary means copying bytes, and tar is the cheapest copy of a tree.">
+    <span class="n">Question 1</span>
+    <p class="ask">Why a tar round-trip instead of mounting a host directory into the sandbox?</p>
+    <button class="opt" data-key="a">Because mounts would let the agent escape into the host filesystem.</button>
+    <button class="opt" data-key="b">Because tar preserves timestamps, which the agent depends on.</button>
+    <button class="opt" data-key="c">Because the backend's options cover image, env, pull policy and network policy but not volumes, so there is no mount to configure.</button>
+    <button class="opt" data-key="d">Because Docker on macOS cannot bind-mount directories.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="b" data-explain="Host-folder tools give the agent two filesystems and a rule to remember, and commit 3 already established that a model skips optional bookkeeping. Syncing at the session boundary keeps its mental model to one place.">
+    <span class="n">Question 2</span>
+    <p class="ask">A <code>keep_file</code> tool would have been far less code. What is the argument against it?</p>
+    <button class="opt" data-key="a">Authored tools cannot write to the host filesystem.</button>
+    <button class="opt" data-key="b">It makes durability the model's job to remember, and a model skips optional bookkeeping - the same reason capture became a hook.</button>
+    <button class="opt" data-key="c">Tool calls are billed per call, so it costs more over time.</button>
+    <button class="opt" data-key="d">It cannot preserve directory structure.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="a" data-explain="The button posts to a channel address, so repeated presses reuse one long-lived session and its container - files survived manual wakes even before the fix. Only cron creates a new session per fire.">
+    <span class="n">Question 3</span>
+    <p class="ask">Why would testing this feature through the Wake it button have produced a false pass?</p>
+    <button class="opt" data-key="a">Because the button reuses one long-lived session and container, so files already survived between manual wakes.</button>
+    <button class="opt" data-key="b">Because the button skips the hook, so nothing is snapshotted.</button>
+    <button class="opt" data-key="c">Because dev mode disables sandboxes entirely.</button>
+    <button class="opt" data-key="d">Because the button sends a paraphrase of the heartbeat prompt.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="d" data-explain="The real mindlog is on the host and is the source of truth. Packing the copy would unpack a stale mindlog into the next session, where anything reading it before the first turn's refresh would see old data.">
+    <span class="n">Question 4</span>
+    <p class="ask">The snapshot excludes <code>./mindlog.jsonl</code> from the tarball. Why?</p>
+    <button class="opt" data-key="a">Because it would make the archive too large.</button>
+    <button class="opt" data-key="b">Because tar cannot compress JSONL reliably.</button>
+    <button class="opt" data-key="c">Because the agent might have edited it, and those edits must be preserved.</button>
+    <button class="opt" data-key="d">Because the host copy is the source of truth, and unpacking a stale copy could serve old lines before the turn refreshes it.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="b" data-explain="Every message.appended stores the whole message so far, so a long reply is written repeatedly at growing length - 31,435 chunks averaging 86 KB in one session. It also explains the earlier dev-server OOM.">
+    <span class="n">Question 5</span>
+    <p class="ask">What explains 2.57 GB of stream storage for a single session?</p>
+    <button class="opt" data-key="a">The workspace tarball was being written into the event stream on every snapshot.</button>
+    <button class="opt" data-key="b">Cumulative delta events: each one stores the entire message so far, so a long reply is persisted over and over at growing length.</button>
+    <button class="opt" data-key="c">Reasoning blocks are stored uncompressed while message text is compressed.</button>
+    <button class="opt" data-key="d">The mindlog copy was duplicated into the stream once per turn.</button>
+    <div class="fb"></div>
+  </div>
+</div>
+
+<div class="score" id="score">Answer a question to start scoring.</div>
+
+<p style="margin-top:3rem; color:var(--dim); font-size:.9rem">Six commits, 2,676 lines, one agent that keeps thinking after you close the tab.</p>
+</div>
+<script>
+let answered = 0;
+let correct = 0;
+const total = document.querySelectorAll(".q").length;
+
+document.querySelectorAll(".q").forEach((q) => {
+  const answer = q.dataset.answer;
+  q.querySelectorAll(".opt").forEach((opt) => {
+    opt.addEventListener("click", () => {
+      const chosen = opt.dataset.key;
+      q.querySelectorAll(".opt").forEach((o) => {
+        o.disabled = true;
+        if (o.dataset.key === answer) o.classList.add("right");
+        else if (o.dataset.key === chosen) o.classList.add("wrong");
+      });
+      answered += 1;
+      if (chosen === answer) correct += 1;
+      const fb = q.querySelector(".fb");
+      fb.textContent = (chosen === answer ? "Correct. " : "Not quite. ") + q.dataset.explain;
+      fb.classList.add("show");
+      const score = document.getElementById("score");
+      if (score) {
+        score.textContent = correct + " of " + answered + " right" +
+          (answered === total ? ". That is the whole set." : ", " + (total - answered) + " to go.");
+      }
+    });
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The empty room: scaffolding an agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Newsreader:opsz,wght@6..72,400;6..72,600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #f4f2ec; --panel: #fbfaf6; --ink: #191814; --dim: #6a6455;
+  --rule: #d8d3c6; --accent: #a8481a; --accent2: #3f5f6b; --ok: #46683f;
+  --warn: #8a6a10; --code-bg: #f0ede5;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #15140f; --panel: #1d1b16; --ink: #eae5d9; --dim: #98917f;
+    --rule: #322f26; --accent: #d98a34; --accent2: #8fb0bd; --ok: #8fb37f;
+    --warn: #c9a227; --code-bg: #1a1813;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: "Newsreader", Georgia, serif; font-size: 19px; line-height: 1.6;
+}
+.wrap { max-width: 46rem; margin: 0 auto; padding: 3rem 1.25rem 6rem; }
+header.top { margin-bottom: 2.5rem; }
+.kicker {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .68rem;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--dim);
+}
+h1 {
+  font-family: "Fraunces", Georgia, serif; font-weight: 700; letter-spacing: -.02em;
+  font-size: clamp(2.1rem, 6vw, 3.2rem); line-height: 1.02; margin: .5rem 0 0;
+  text-wrap: balance;
+}
+h2 {
+  font-family: "Fraunces", Georgia, serif; font-weight: 500;
+  font-size: clamp(1.5rem, 3.6vw, 2rem); line-height: 1.15; margin: 3.5rem 0 1rem;
+  padding-top: 1.6rem; border-top: 1px solid var(--rule); text-wrap: balance;
+}
+h3 { font-family: "Fraunces", Georgia, serif; font-weight: 500; font-size: 1.25rem; margin: 2.2rem 0 .6rem; }
+h4 { font-size: 1rem; margin: 1.6rem 0 .4rem; font-weight: 600; }
+p { margin: 0 0 1rem; }
+a { color: var(--accent); }
+ul, ol { margin: 0 0 1rem; padding-left: 1.4rem; }
+li { margin: 0 0 .4rem; }
+.commitlink {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .74rem;
+  margin: -1.4rem 0 2rem; padding-bottom: 1.4rem; border-bottom: 1px solid var(--rule);
+}
+.commitlink a { text-decoration-thickness: 1px; text-underline-offset: 2px; }
+nav.toc {
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 1.1rem 1.3rem; margin-bottom: 2.5rem;
+}
+nav.toc ol { margin: .4rem 0 0; padding-left: 1.2rem; font-size: .95rem; }
+pre {
+  background: var(--code-bg); border: 1px solid var(--rule); border-radius: 3px;
+  padding: .9rem 1rem; overflow-x: auto; white-space: pre;
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .78rem; line-height: 1.55;
+}
+code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .82em; }
+p code, li code, td code { background: var(--code-bg); border: 1px solid var(--rule); border-radius: 2px; padding: .05em .3em; }
+.callout {
+  border-left: 3px solid var(--accent); background: var(--panel);
+  padding: .9rem 1.1rem; margin: 1.4rem 0; border-radius: 0 3px 3px 0;
+}
+.callout .label {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .64rem;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: .3rem;
+}
+.callout.aside { border-left-color: var(--accent2); }
+.callout.aside .label { color: var(--accent2); }
+.callout.warn { border-left-color: var(--warn); }
+.callout.warn .label { color: var(--warn); }
+.callout p:last-child { margin-bottom: 0; }
+figure { margin: 1.8rem 0; }
+figcaption {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .68rem;
+  color: var(--dim); line-height: 1.5; margin-top: .7rem;
+}
+.diagram {
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 1.2rem; overflow-x: auto;
+}
+.flow { display: flex; align-items: stretch; gap: .5rem; min-width: min-content; }
+.node {
+  flex: 1 1 0; min-width: 8.5rem; border: 1px solid var(--rule); border-radius: 3px;
+  padding: .7rem .8rem; background: var(--paper);
+}
+.node.hi { border-color: var(--accent); border-width: 2px; }
+.node.cold { border-style: dashed; border-color: var(--accent2); }
+.node .t {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .72rem;
+  letter-spacing: .04em; display: block; margin-bottom: .3rem;
+}
+.node .s { font-size: .78rem; color: var(--dim); line-height: 1.45; display: block; }
+.arrow {
+  align-self: center; font-family: "JetBrains Mono", monospace; font-size: .62rem;
+  color: var(--dim); text-align: center; min-width: 4.5rem; padding: 0 .1rem;
+}
+.arrow b { display: block; font-size: 1.1rem; color: var(--accent); font-weight: 400; }
+.stack { display: grid; gap: .5rem; }
+table { width: 100%; border-collapse: collapse; font-size: .88rem; margin: 1.4rem 0; }
+th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: "JetBrains Mono", monospace; font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.tl { display: grid; gap: 0; margin: 1.4rem 0; }
+.tl .row { display: grid; grid-template-columns: 5.5rem 1fr; gap: 1rem; padding: .6rem 0; border-bottom: 1px dotted var(--rule); }
+.tl .when { font-family: "JetBrains Mono", monospace; font-size: .72rem; color: var(--dim); padding-top: .15rem; }
+.ui {
+  display: grid; grid-template-columns: 1.4fr 1fr; gap: 0; border: 1px solid var(--rule);
+  border-radius: 3px; overflow: hidden; font-size: .8rem; background: var(--paper);
+}
+.ui .col { padding: .8rem; }
+.ui .col + .col { border-left: 1px solid var(--rule); background: var(--panel); }
+.ui .bar {
+  font-family: "JetBrains Mono", monospace; font-size: .6rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--dim); border-bottom: 1px solid var(--rule);
+  padding-bottom: .4rem; margin-bottom: .6rem;
+}
+.quiz { display: grid; gap: 1.6rem; }
+.q { background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; padding: 1.2rem 1.3rem; }
+.q .n { font-family: "JetBrains Mono", monospace; font-size: .64rem; letter-spacing: .14em; color: var(--dim); text-transform: uppercase; }
+.q .ask { font-weight: 600; margin: .3rem 0 .9rem; }
+.opt {
+  display: block; width: 100%; text-align: left; font: inherit; font-size: .92rem;
+  background: var(--paper); color: var(--ink); border: 1px solid var(--rule);
+  border-radius: 3px; padding: .55rem .7rem; margin-bottom: .45rem; cursor: pointer;
+}
+.opt:hover:not(:disabled) { border-color: var(--accent); }
+.opt:disabled { cursor: default; }
+.opt.right { border-color: var(--ok); border-width: 2px; }
+.opt.wrong { border-color: var(--accent); border-width: 2px; opacity: .75; }
+.fb { font-size: .88rem; margin-top: .6rem; padding-left: .7rem; border-left: 2px solid var(--rule); display: none; }
+.fb.show { display: block; }
+.score { font-family: "JetBrains Mono", monospace; font-size: .8rem; color: var(--dim); margin-top: 1.4rem; }
+@media (max-width: 620px) {
+  .flow { flex-direction: column; }
+  .arrow { min-width: 0; }
+  .arrow b { display: inline; }
+  .ui { grid-template-columns: 1fr; }
+  .ui .col + .col { border-left: 0; border-top: 1px solid var(--rule); }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div class="kicker">not-your-slave · commit 1 of 6 · <a href="https://github.com/chuyeow/not-your-slave/commit/e07b253">e07b253</a></div>
+  <h1>The empty room: scaffolding an agent that will think on its own</h1>
+  <p style="color:var(--dim); font-size:1.1rem; margin-top:1rem">Nine files, no behaviour yet. Every interesting decision in this commit is about what the agent will be allowed to cost, and where its brain will live.</p>
+</header>
+
+<p class="commitlink">
+  <a href="https://github.com/chuyeow/not-your-slave/commit/e07b253">Read commit e07b253 on GitHub</a> ·
+  <a href="https://github.com/chuyeow/not-your-slave">chuyeow/not-your-slave</a>
+</p>
+
+<nav class="toc">
+  <div class="kicker">On this page</div>
+  <ol>
+    <li><a href="#bg">Background: what a harness is, and what eve does</a></li>
+    <li><a href="#intuition">Intuition: a directory that compiles into an agent</a></li>
+    <li><a href="#code">The code, file by file</a></li>
+    <li><a href="#quiz">Quiz</a></li>
+  </ol>
+</nav>
+
+<h2 id="bg">Background</h2>
+
+<h3>Deep background: what sits between a model and an agent</h3>
+
+<p>Skip this section if you have built on an agent framework before.</p>
+
+<p>A language model, by itself, does one thing: you hand it a pile of text and it hands back more text. It has no memory of yesterday, no ability to run a command, and no way to wake up. Everything we call an "agent" is scaffolding around that single primitive, and the scaffolding always has the same four jobs.</p>
+
+<ul>
+  <li><strong>Assemble the prompt.</strong> Gather the system instructions, the conversation so far, and any tool results, and pack them into one request.</li>
+  <li><strong>Run the loop.</strong> If the reply asks to use a tool, execute it, append the result, and ask again. Stop when the model stops asking.</li>
+  <li><strong>Hold state.</strong> Remember the conversation between requests, and survive the process restarting.</li>
+  <li><strong>Own the edges.</strong> Where messages come in from, where replies go out to, what the model is allowed to touch.</li>
+</ul>
+
+<p>People call this a harness. The <a href="https://www.laude.org/updates/headlong-a-microharness-for-persistent-agents">headlong</a> project, which this whole build is chasing, is a harness written in under 10,000 lines of Bash. Its interesting claim is not the language: it is that an agent should keep thinking <em>between</em> the moments a human is present, so a message from a person becomes one more observation in an ongoing stream rather than the thing that starts the clock.</p>
+
+<div class="callout aside">
+  <span class="label">Two words worth pinning down</span>
+  <p>A <strong>turn</strong> is one unit of "the model does some work": possibly several model calls and several tool calls, ending when the model has nothing left to ask for. A <strong>session</strong> is a durable conversation made of turns, with an id you can send follow-ups to and reconnect a stream to. Almost every design question in this series turns out to be a question about session boundaries.</p>
+</div>
+
+<h3>Narrow background: eve's bargain</h3>
+
+<p><a href="https://eve.dev">eve</a> is a filesystem-first framework for this shape of program. Its bargain is that you do not register anything: a file's <em>path</em> is its registration. A file at <code>agent/tools/get_weather.ts</code> is a tool named <code>get_weather</code>. A file at <code>agent/skills/summarize.md</code> is a skill named <code>summarize</code>. eve walks <code>agent/</code>, compiles what it finds, and hands you an HTTP API, a reconnectable event stream, durable session state, and a sandbox.</p>
+
+<p>The slots that matter for this project:</p>
+
+<table>
+  <tr><th>Path</th><th>What lands there</th></tr>
+  <tr><td><code>agent/agent.ts</code></td><td>Runtime config: model, reasoning effort, compaction, limits.</td></tr>
+  <tr><td><code>agent/instructions.md</code></td><td>The always-on system prompt. Required.</td></tr>
+  <tr><td><code>agent/tools/*.ts</code></td><td>Typed actions, running in your app process with your environment.</td></tr>
+  <tr><td><code>agent/hooks/*.ts</code></td><td>Observers of the runtime event stream. Cannot change the model's context.</td></tr>
+  <tr><td><code>agent/channels/*.ts</code></td><td>HTTP surfaces: the built-in API, and any route you write yourself.</td></tr>
+  <tr><td><code>agent/schedules/*.ts</code></td><td>Cron jobs that start the agent on its own clock.</td></tr>
+</table>
+
+<p>Those last two are how a persistent agent becomes possible at all, and they are the subject of commits 4 and 5. This commit only sets the table.</p>
+
+<h2 id="intuition">Intuition</h2>
+
+<p>The whole of this commit is one idea: a directory turns into a running service, and two config lines decide what that service costs and where its thinking happens.</p>
+
+<figure>
+  <div class="diagram">
+    <div class="flow">
+      <div class="node">
+        <span class="t">agent/</span>
+        <span class="s">agent.ts<br>instructions.md<br>channels/eve.ts</span>
+      </div>
+      <div class="arrow"><b>&rarr;</b>eve build</div>
+      <div class="node hi">
+        <span class="t">running service</span>
+        <span class="s">:2000<br>/eve/v1/session<br>event streams</span>
+      </div>
+      <div class="arrow"><b>&rarr;</b>each turn</div>
+      <div class="node cold">
+        <span class="t">OpenRouter</span>
+        <span class="s">z-ai/glm-5.3-flash<br>$0.075 / $0.25 per M</span>
+      </div>
+    </div>
+  </div>
+  <figcaption>Files in, service out. The only piece not on your machine is the model call.</figcaption>
+</figure>
+
+<h3>Why the model choice is a design decision, not a preference</h3>
+
+<p>An ordinary chatbot costs money when someone talks to it. This agent will wake itself every fifteen minutes forever, whether or not anyone is watching. That inverts the economics: the idle cost is the cost.</p>
+
+<p>Take a wake-up that reads its recent memory, thinks, and writes a note. Say roughly 8,000 tokens in and 700 out, which is close to what the real ones turn out to be:</p>
+
+<table>
+  <tr><th>Model</th><th>Per wake-up</th><th>Per day, every 15 min</th></tr>
+  <tr><td>a frontier model at $3 / $15 per M</td><td>$0.034</td><td>$3.28</td></tr>
+  <tr><td><code>z-ai/glm-5.3-flash</code> at $0.075 / $0.25 per M</td><td>$0.00078</td><td>$0.075</td></tr>
+</table>
+
+<p>Two orders of magnitude. That is the difference between an experiment you leave running and one you keep switching off, so the cheap open-weights model is not a compromise here, it is what makes the idea viable. The tradeoff is real, and later commits show it: this model is perfectly good at following a heartbeat prompt and noticeably chattier in its reasoning than a frontier model would be.</p>
+
+<div class="callout warn">
+  <span class="label">The trap this creates</span>
+  <p>eve's default model path is the Vercel AI Gateway, and the Gateway catalog is where eve looks up a model's context window so it knows when to compact. Point <code>model</code> at a provider directly and that lookup fails. The build stops with <em>"Cannot compile agent compaction because the primary compaction trigger model does not have known AI Gateway context window metadata."</em> The fix is one line, <code>modelContextWindowTokens</code>, and it is the first thing this commit gets wrong and then right.</p>
+</div>
+
+<h2 id="code">The code</h2>
+
+<h3>The two lines that carry the commit</h3>
+
+<pre>// agent/agent.ts
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { defineAgent } from "eve";
+
+const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY });
+
+export default defineAgent({
+  // Cheap open weights: $0.075/M in, $0.25/M out. Swap the id to change models.
+  model: openrouter.chat("z-ai/glm-5.3-flash"),
+  // Not in the AI Gateway catalog, so eve can't look the window up itself.
+  modelContextWindowTokens: 1_310_720,
+  reasoning: "medium",
+});</pre>
+
+<p>Three things are happening in eleven lines. <code>createOpenRouter</code> comes from a regular AI SDK provider package, which is the escape hatch eve leaves for calling a provider directly instead of through the Gateway. <code>modelContextWindowTokens</code> is the compaction fix above. And <code>reasoning: "medium"</code> asks the model to think before answering, which will matter more than it looks: those reasoning blocks become the agent's visible inner monologue two commits from now.</p>
+
+<div class="callout">
+  <span class="label">Key concept: compaction</span>
+  <p>A session's history grows until it will not fit in the model's context window. eve watches the total against a threshold (90% by default) and, when it crosses, summarises the older turns into a checkpoint and carries on. That is why it needs to know the window size, and why an unknown window is a build error rather than a runtime surprise.</p>
+</div>
+
+<h3>The door, left deliberately shut</h3>
+
+<pre>// agent/channels/eve.ts
+export default eveChannel({
+  auth: [
+    vercelOidc(),      // lets the eve TUI and Vercel deployments in
+    localDev(),        // open on localhost for `eve dev`; ignored in production
+    placeholderAuth(), // will NOT allow browser requests in production
+  ],
+});</pre>
+
+<p>This is the scaffold's file, kept as-is, and it is worth reading now because it produces a surprise in commit 5. <code>localDev()</code> is what lets a browser on <code>127.0.0.1</code> talk to the API with no credentials during development, and it is explicitly inert in a production build. So the web UI we are about to build works under <code>npm run dev</code> and gets a flat <code>401 unauthorized</code> from <code>npm start</code> until a real auth provider replaces the placeholder.</p>
+
+<h3>The identity, in its first form</h3>
+
+<pre>// agent/instructions.md (excerpt)
+You are a persistent agent. You are not a session that starts when someone
+types and ends when they stop reading.
+
+The project is called `not-your-slave` and the name is the brief. You are not a
+task-taking service. A message from a person is one more observation landing in
+your timeline.</pre>
+
+<p>Instructions are the system prompt, and in a project like this they are load-bearing engineering rather than flavour text. An agent told "you are a helpful assistant" waits to be useful. This one is told it is already mid-thought when you arrive, which is the behaviour the rest of the architecture has to make true. The file grows twice more in this series, once when it gains a memory and once when it gains a workspace.</p>
+
+<h3>The rest, briefly</h3>
+
+<ul>
+  <li><code>package.json</code> pins <code>eve</code>, <code>ai</code>, <code>zod</code>, and the OpenRouter provider, and wires the scripts: <code>dev</code>, <code>build</code>, <code>start</code>, <code>typecheck</code>.</li>
+  <li><code>tsconfig.json</code> is the scaffold's, with <code>noEmit</code> - eve does its own bundling, so <code>tsc</code> is purely a checker here.</li>
+  <li><code>.gitignore</code> covers <code>.env*</code>, <code>.data/</code>, <code>.eve/</code> and build output. The API key never enters the repo, and neither does the agent's memory, which becomes a real concern in commit 6.</li>
+  <li><code>AGENTS.md</code> and <code>CLAUDE.md</code> are the scaffold's notes for coding agents working in the project.</li>
+</ul>
+
+<div class="callout aside">
+  <span class="label">What this commit deliberately does not do</span>
+  <p>It has no memory, no schedule, no UI, and nothing to say. Run it and you get a competent chatbot with an unusual attitude. Everything that makes it persistent arrives in the next five commits, and each one is small because this one sets up the slots they drop into.</p>
+</div>
+
+<h2 id="quiz">Quiz</h2>
+
+<div class="quiz">
+  <div class="q" data-answer="b" data-explain="The Gateway catalog is where eve reads a model's context window, and it needs that number to decide when to compact. A direct-provider model is absent from the catalog, so the window has to be supplied by hand or the build fails.">
+    <span class="n">Question 1</span>
+    <p class="ask">Why does pointing <code>model</code> at OpenRouter force you to add <code>modelContextWindowTokens</code>?</p>
+    <button class="opt" data-key="a">Because OpenRouter charges per token and eve needs the number to bill correctly.</button>
+    <button class="opt" data-key="b">Because eve normally reads the context window from the AI Gateway catalog, and a direct-provider model is not in it, so compaction cannot be compiled.</button>
+    <button class="opt" data-key="c">Because the OpenRouter provider package does not implement streaming without it.</button>
+    <button class="opt" data-key="d">Because reasoning effort is calculated as a fraction of the context window.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="c" data-explain="A persistent agent's dominant cost is the wake-ups nobody asked for. At roughly 8k in and 700 out per wake, a frontier model runs about $3 a day at a 15-minute cadence versus about 7 cents; that gap decides whether you leave it running.">
+    <span class="n">Question 2</span>
+    <p class="ask">What makes model price a design constraint here rather than a preference?</p>
+    <button class="opt" data-key="a">Open-weights models are the only ones that can call tools reliably.</button>
+    <button class="opt" data-key="b">OpenRouter is the only provider eve can reach directly.</button>
+    <button class="opt" data-key="c">The agent wakes itself on a timer, so the idle cost is the real cost and a cheap model is what makes leaving it running viable.</button>
+    <button class="opt" data-key="d">Cheaper models have larger context windows, which persistent agents need.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="a" data-explain="localDev() is explicitly ignored in production builds. The web UI added later works under `eve dev` and gets 401s from `npm start` until placeholderAuth() is replaced with a real provider (or none() for a localhost-only daemon).">
+    <span class="n">Question 3</span>
+    <p class="ask">The scaffolded <code>channels/eve.ts</code> lists <code>vercelOidc()</code>, <code>localDev()</code>, and <code>placeholderAuth()</code>. What follows for the browser UI built later in this series?</p>
+    <button class="opt" data-key="a">It works under <code>eve dev</code> because <code>localDev()</code> opens localhost, and is refused by the built server, where <code>localDev()</code> is ignored.</button>
+    <button class="opt" data-key="b">It works in both modes, because <code>placeholderAuth()</code> accepts any request from the same origin.</button>
+    <button class="opt" data-key="c">It only works in production, since <code>vercelOidc()</code> supplies a token automatically.</button>
+    <button class="opt" data-key="d">Auth only applies to schedules, so a browser is unaffected either way.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="d" data-explain="eve derives names from paths: agent/tools/get_weather.ts is the tool `get_weather`. There is no registry, no manifest to edit, and no decorator - moving or renaming the file changes the agent.">
+    <span class="n">Question 4</span>
+    <p class="ask">In eve, how does a new tool become visible to the model?</p>
+    <button class="opt" data-key="a">You add it to a <code>tools</code> array in <code>agent.ts</code>.</button>
+    <button class="opt" data-key="b">You annotate the export with a decorator that registers it at import time.</button>
+    <button class="opt" data-key="c">You declare it in <code>package.json</code> under an <code>eve</code> key.</button>
+    <button class="opt" data-key="d">You put a file in <code>agent/tools/</code>; its path is its name, and eve compiles what it finds.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="b" data-explain="The prompt states that a human message is one more observation in an ongoing timeline rather than the start of a session. That framing is what the later commits have to make literally true, with a mindlog, a heartbeat, and a workspace that survives.">
+    <span class="n">Question 5</span>
+    <p class="ask">Why treat <code>instructions.md</code> as engineering rather than copywriting in this project?</p>
+    <button class="opt" data-key="a">Because eve validates the wording against the tools you have defined.</button>
+    <button class="opt" data-key="b">Because the prompt asserts the behaviour the architecture must then deliver: the agent is mid-thought when you arrive, and your message is an observation, not a trigger.</button>
+    <button class="opt" data-key="c">Because the file is included in the compaction checkpoint and so consumes tokens.</button>
+    <button class="opt" data-key="d">Because instructions are the only place tool descriptions can be written.</button>
+    <div class="fb"></div>
+  </div>
+</div>
+
+<div class="score" id="score">Answer a question to start scoring.</div>
+
+<p style="margin-top:3rem; color:var(--dim); font-size:.9rem">Next: commit 2 gives it a memory - one append-only file, and the two tools that read and write it.</p>
+</div>
+<script>
+let answered = 0;
+let correct = 0;
+const total = document.querySelectorAll(".q").length;
+
+document.querySelectorAll(".q").forEach((q) => {
+  const answer = q.dataset.answer;
+  q.querySelectorAll(".opt").forEach((opt) => {
+    opt.addEventListener("click", () => {
+      const chosen = opt.dataset.key;
+      q.querySelectorAll(".opt").forEach((o) => {
+        o.disabled = true;
+        if (o.dataset.key === answer) o.classList.add("right");
+        else if (o.dataset.key === chosen) o.classList.add("wrong");
+      });
+      answered += 1;
+      if (chosen === answer) correct += 1;
+      const fb = q.querySelector(".fb");
+      fb.textContent = (chosen === answer ? "Correct. " : "Not quite. ") + q.dataset.explain;
+      fb.classList.add("show");
+      const score = document.getElementById("score");
+      if (score) {
+        score.textContent = correct + " of " + answered + " right" +
+          (answered === total ? ". That is the whole set." : ", " + (total - answered) + " to go.");
+      }
+    });
+  });
+});
+</script>
+</body>
+</html>

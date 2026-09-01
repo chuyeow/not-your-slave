@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The window: a stream that survives a refresh</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Newsreader:opsz,wght@6..72,400;6..72,600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #f4f2ec; --panel: #fbfaf6; --ink: #191814; --dim: #6a6455;
+  --rule: #d8d3c6; --accent: #a8481a; --accent2: #3f5f6b; --ok: #46683f;
+  --warn: #8a6a10; --code-bg: #f0ede5;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #15140f; --panel: #1d1b16; --ink: #eae5d9; --dim: #98917f;
+    --rule: #322f26; --accent: #d98a34; --accent2: #8fb0bd; --ok: #8fb37f;
+    --warn: #c9a227; --code-bg: #1a1813;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: "Newsreader", Georgia, serif; font-size: 19px; line-height: 1.6;
+}
+.wrap { max-width: 46rem; margin: 0 auto; padding: 3rem 1.25rem 6rem; }
+header.top { margin-bottom: 2.5rem; }
+.kicker {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .68rem;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--dim);
+}
+h1 {
+  font-family: "Fraunces", Georgia, serif; font-weight: 700; letter-spacing: -.02em;
+  font-size: clamp(2.1rem, 6vw, 3.2rem); line-height: 1.02; margin: .5rem 0 0;
+  text-wrap: balance;
+}
+h2 {
+  font-family: "Fraunces", Georgia, serif; font-weight: 500;
+  font-size: clamp(1.5rem, 3.6vw, 2rem); line-height: 1.15; margin: 3.5rem 0 1rem;
+  padding-top: 1.6rem; border-top: 1px solid var(--rule); text-wrap: balance;
+}
+h3 { font-family: "Fraunces", Georgia, serif; font-weight: 500; font-size: 1.25rem; margin: 2.2rem 0 .6rem; }
+h4 { font-size: 1rem; margin: 1.6rem 0 .4rem; font-weight: 600; }
+p { margin: 0 0 1rem; }
+a { color: var(--accent); }
+ul, ol { margin: 0 0 1rem; padding-left: 1.4rem; }
+li { margin: 0 0 .4rem; }
+.commitlink {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .74rem;
+  margin: -1.4rem 0 2rem; padding-bottom: 1.4rem; border-bottom: 1px solid var(--rule);
+}
+.commitlink a { text-decoration-thickness: 1px; text-underline-offset: 2px; }
+nav.toc {
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 1.1rem 1.3rem; margin-bottom: 2.5rem;
+}
+nav.toc ol { margin: .4rem 0 0; padding-left: 1.2rem; font-size: .95rem; }
+pre {
+  background: var(--code-bg); border: 1px solid var(--rule); border-radius: 3px;
+  padding: .9rem 1rem; overflow-x: auto; white-space: pre;
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .78rem; line-height: 1.55;
+}
+code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .82em; }
+p code, li code, td code { background: var(--code-bg); border: 1px solid var(--rule); border-radius: 2px; padding: .05em .3em; }
+.callout {
+  border-left: 3px solid var(--accent); background: var(--panel);
+  padding: .9rem 1.1rem; margin: 1.4rem 0; border-radius: 0 3px 3px 0;
+}
+.callout .label {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .64rem;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: .3rem;
+}
+.callout.aside { border-left-color: var(--accent2); }
+.callout.aside .label { color: var(--accent2); }
+.callout.warn { border-left-color: var(--warn); }
+.callout.warn .label { color: var(--warn); }
+.callout p:last-child { margin-bottom: 0; }
+figure { margin: 1.8rem 0; }
+figcaption {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .68rem;
+  color: var(--dim); line-height: 1.5; margin-top: .7rem;
+}
+.diagram {
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 1.2rem; overflow-x: auto;
+}
+.flow { display: flex; align-items: stretch; gap: .5rem; min-width: min-content; }
+.node {
+  flex: 1 1 0; min-width: 8.5rem; border: 1px solid var(--rule); border-radius: 3px;
+  padding: .7rem .8rem; background: var(--paper);
+}
+.node.hi { border-color: var(--accent); border-width: 2px; }
+.node.cold { border-style: dashed; border-color: var(--accent2); }
+.node .t {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .72rem;
+  letter-spacing: .04em; display: block; margin-bottom: .3rem;
+}
+.node .s { font-size: .78rem; color: var(--dim); line-height: 1.45; display: block; }
+.arrow {
+  align-self: center; font-family: "JetBrains Mono", monospace; font-size: .62rem;
+  color: var(--dim); text-align: center; min-width: 4.5rem; padding: 0 .1rem;
+}
+.arrow b { display: block; font-size: 1.1rem; color: var(--accent); font-weight: 400; }
+.stack { display: grid; gap: .5rem; }
+table { width: 100%; border-collapse: collapse; font-size: .88rem; margin: 1.4rem 0; }
+th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: "JetBrains Mono", monospace; font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.tl { display: grid; gap: 0; margin: 1.4rem 0; }
+.tl .row { display: grid; grid-template-columns: 5.5rem 1fr; gap: 1rem; padding: .6rem 0; border-bottom: 1px dotted var(--rule); }
+.tl .when { font-family: "JetBrains Mono", monospace; font-size: .72rem; color: var(--dim); padding-top: .15rem; }
+.ui {
+  display: grid; grid-template-columns: 1.4fr 1fr; gap: 0; border: 1px solid var(--rule);
+  border-radius: 3px; overflow: hidden; font-size: .8rem; background: var(--paper);
+}
+.ui .col { padding: .8rem; }
+.ui .col + .col { border-left: 1px solid var(--rule); background: var(--panel); }
+.ui .bar {
+  font-family: "JetBrains Mono", monospace; font-size: .6rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--dim); border-bottom: 1px solid var(--rule);
+  padding-bottom: .4rem; margin-bottom: .6rem;
+}
+.quiz { display: grid; gap: 1.6rem; }
+.q { background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; padding: 1.2rem 1.3rem; }
+.q .n { font-family: "JetBrains Mono", monospace; font-size: .64rem; letter-spacing: .14em; color: var(--dim); text-transform: uppercase; }
+.q .ask { font-weight: 600; margin: .3rem 0 .9rem; }
+.opt {
+  display: block; width: 100%; text-align: left; font: inherit; font-size: .92rem;
+  background: var(--paper); color: var(--ink); border: 1px solid var(--rule);
+  border-radius: 3px; padding: .55rem .7rem; margin-bottom: .45rem; cursor: pointer;
+}
+.opt:hover:not(:disabled) { border-color: var(--accent); }
+.opt:disabled { cursor: default; }
+.opt.right { border-color: var(--ok); border-width: 2px; }
+.opt.wrong { border-color: var(--accent); border-width: 2px; opacity: .75; }
+.fb { font-size: .88rem; margin-top: .6rem; padding-left: .7rem; border-left: 2px solid var(--rule); display: none; }
+.fb.show { display: block; }
+.score { font-family: "JetBrains Mono", monospace; font-size: .8rem; color: var(--dim); margin-top: 1.4rem; }
+@media (max-width: 620px) {
+  .flow { flex-direction: column; }
+  .arrow { min-width: 0; }
+  .arrow b { display: inline; }
+  .ui { grid-template-columns: 1fr; }
+  .ui .col + .col { border-left: 0; border-top: 1px solid var(--rule); }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div class="kicker">not-your-slave · commit 5 of 6 · <a href="https://github.com/chuyeow/not-your-slave/commit/5d117e6">5d117e6</a></div>
+  <h1>The window: a stream that survives a refresh</h1>
+  <p style="color:var(--dim); font-size:1.1rem; margin-top:1rem">One channel, three routes, and 537 lines of vanilla page. Almost every bug in here was a bug about <em>where the transcript lives</em>.</p>
+</header>
+
+<p class="commitlink">
+  <a href="https://github.com/chuyeow/not-your-slave/commit/5d117e6">Read commit 5d117e6 on GitHub</a> ·
+  <a href="https://github.com/chuyeow/not-your-slave">chuyeow/not-your-slave</a>
+</p>
+
+<nav class="toc">
+  <div class="kicker">On this page</div>
+  <ol>
+    <li><a href="#bg">Background: channels, sessions, and the event stream</a></li>
+    <li><a href="#intuition">Intuition: one reader, one cursor</a></li>
+    <li><a href="#code">The code</a></li>
+    <li><a href="#quiz">Quiz</a></li>
+  </ol>
+</nav>
+
+<h2 id="bg">Background</h2>
+
+<h3>Deep background: why streaming chat UIs are harder than they look</h3>
+
+<p>Skip if you have built one before.</p>
+
+<p>A chat UI has to solve three problems that pull against each other. It must show text as it arrives, so the page feels alive. It must survive a reload, because people reload. And it must not show the same message twice, which sounds trivial until the first two requirements are in place.</p>
+
+<p>The usual solution is for the client to keep its own copy of the conversation: append each message to an array, persist it, render from it. That works and it is what most chat apps do. It also means two sources of truth - the server's history and the client's array - and every bug in a chat UI you have ever hit is the seam between them.</p>
+
+<p>eve offers a way out. Every event of a session is durably recorded before its step completes, and the stream endpoint takes an absolute cursor:</p>
+
+<pre>GET /eve/v1/session/:id/stream                       # follow live
+GET /eve/v1/session/:id/stream?startIndex=0          # replay from the beginning
+GET /eve/v1/session/:id/stream?startIndex=-1         # start at the tail
+GET /eve/v1/session/:id/stream?startIndex=12&amp;includeTailIndex=1   # catch up, then stop</pre>
+
+<p>If the server can replay the conversation on demand, the client does not need to store it. That single fact shapes the whole page.</p>
+
+<h3>Narrow background: custom channels</h3>
+
+<p>A file in <code>agent/channels/</code> can declare HTTP routes with <code>GET</code> and <code>POST</code> helpers, and each route receives operation surfaces - most importantly <code>from(address)</code>, which binds <code>send</code> and friends to a channel-local conversation address, creating a session if that address has none.</p>
+
+<div class="callout warn">
+  <span class="label">The gotcha that names the file</span>
+  <p>eve's framework default already serves <code>GET /</code>, from a source at <code>channels/home.ts</code>. Declaring <code>GET /</code> in <code>channels/web.ts</code> compiles, then warns: <em>"GET / from channels/web.ts is shadowed by channels/home.ts"</em>. Framework defaults occupy ordinary agent slots, so authoring the same path replaces the default - which means the file has to be called <code>home.ts</code>. A five-second fix that is invisible until you read the warning.</p>
+</div>
+
+<h2 id="intuition">Intuition</h2>
+
+<p>The interesting design decision is the one that got made twice. Here is the first version, which is what you write if you think of a stream as a request:</p>
+
+<figure>
+  <div class="diagram">
+    <div class="stack">
+      <div class="node cold">
+        <span class="t">attempt 1: attach per message</span>
+        <span class="s">send → open a stream → read until the turn ends → close. Repeat next time.</span>
+      </div>
+    </div>
+  </div>
+  <figcaption>Reasonable-looking, and wrong.</figcaption>
+</figure>
+
+<p>The bug it produces is instructive. Open a stream with no cursor and you get the session <em>from the beginning</em>, so the events of the previous turn arrive first. The page happily paints the previous answer into the bubble you just created for the new one - so you ask a question, and watch the answer to your last question appear above your reply that has not been written yet. It looks like a race condition. It is actually a cursor problem.</p>
+
+<figure>
+  <div class="diagram">
+    <div class="stack">
+      <div class="node hi">
+        <span class="t">attempt 2: one long-lived reader</span>
+        <span class="s">on load, replay from index 0 to restore history, then follow from the tail forever. Sending a message adds nothing to the read path.</span>
+      </div>
+    </div>
+  </div>
+  <figcaption>The client stores no transcript at all. There is only one source of truth, so there is nothing to drift.</figcaption>
+</figure>
+
+<p>Concretely, with a session that already has a two-turn history:</p>
+
+<div class="tl">
+  <div class="row"><span class="when">load</span><span><code>?startIndex=0&amp;includeTailIndex=1</code> replays four events. Four bubbles painted. The response ends by itself.</span></div>
+  <div class="row"><span class="when">load+1</span><span><code>?startIndex=-1</code> attaches at the tail and stays open.</span></div>
+  <div class="row"><span class="when">you type</span><span>POST the message. Nothing is attached, nothing replayed. The open reader sees <code>message.received</code>, then the deltas.</span></div>
+  <div class="row"><span class="when">reload</span><span>Same as load. Six bubbles, no duplicates, because nothing was ever stored client-side to duplicate.</span></div>
+</div>
+
+<h3>What the page looks like</h3>
+
+<figure>
+  <div class="ui">
+    <div class="col">
+      <div class="bar">an agent that thinks for itself · idle</div>
+      <p style="margin:0 0 .5rem"><strong style="font-size:.7rem; letter-spacing:.1em; color:var(--accent)">YOU</strong><br>what's up?</p>
+      <p style="margin:0"><strong style="font-size:.7rem; letter-spacing:.1em; color:var(--accent2)">IT</strong><br><strong>Two things since you last asked.</strong> One: I went looking for the mindlog as an actual file…</p>
+    </div>
+    <div class="col">
+      <div class="bar">mindlog · wake it</div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:.68rem; line-height:1.6; color:var(--dim)">
+        14:14:00 &nbsp;<span style="color:var(--accent)">HEARD</span>&nbsp; what's up?<br>
+        14:14:05 &nbsp;<span style="color:var(--accent2)">THOUGHT</span>&nbsp; <em>User asked mid-conversation…</em><br>
+        14:14:16 &nbsp;<span style="color:var(--ok)">SAID</span>&nbsp; **Two things since you last asked.** One…
+      </div>
+    </div>
+  </div>
+  <figcaption>Left pane renders markdown, right pane deliberately does not. The right pane is a log: it shows the characters that were actually written.</figcaption>
+</figure>
+
+<h2 id="code">The code</h2>
+
+<h3>The channel: 25 lines</h3>
+
+<pre>export default defineChannel({
+  routes: [
+    GET("/", async () =&gt;
+      new Response(PAGE, { headers: { "content-type": "text/html; charset=utf-8" } })),
+
+    GET("/api/mindlog", async (request) =&gt; {
+      const limit = Number(new URL(request.url).searchParams.get("limit") ?? 80);
+      return Response.json({ entries: await read(Number.isFinite(limit) ? limit : 80) });
+    }),
+
+    // Fire a heartbeat by hand. `eve dev` never runs cron, so this is how you
+    // watch it think without waiting for production's next tick.
+    POST("/api/think", async (_request, { from }) =&gt; {
+      const session = await from("heartbeat").send(HEARTBEAT, { auth: null });
+      return Response.json({ sessionId: session.id });
+    }),
+  ],
+});</pre>
+
+<p>Chat is conspicuously absent: the page talks to eve's own <code>/eve/v1/session</code> API for that, so the channel only supplies what eve does not already have. Three things to notice.</p>
+
+<ul>
+  <li><strong><code>/api/think</code> sends the exported <code>HEARTBEAT</code></strong> from commit 4. The button is not a simulation of a wake-up, it is the same text cron sends - which is what makes it a usable stand-in during development, where cron never fires.</li>
+  <li><strong><code>from("heartbeat")</code> is a channel-local address</strong>, not a session id. Whichever session currently owns that address gets the message, and one is created if none does. A consequence worth knowing: repeated button presses reuse a single long-lived heartbeat session, whereas cron creates a new one each fire. Same prompt, different continuity, which commit 6 has to reckon with.</li>
+  <li><strong>The page is a string</strong> in <code>agent/lib/page.ts</code> (a <code>String.raw</code> template) rather than a file read at runtime. It gets bundled with the agent and needs no path resolution in production. The cost is that a literal backtick inside the template ends it - a mistake made and fixed while adding the markdown renderer, resolved by writing backticks as <code>`</code>.</li>
+</ul>
+
+<h3>The reader</h3>
+
+<pre>async function follow(id, startIndex) {
+  while (id === sessionId) {
+    try {
+      const res = await fetch("/eve/v1/session/" + id + "/stream?startIndex=" + startIndex);
+      if (!res.ok) return;
+      const reader = res.body.getReader();
+      …
+      for (const line of lines) { handle(JSON.parse(line)); }
+    } catch {}
+    startIndex = -1;              // reconnect at the tail, not the beginning
+    await new Promise((r) =&gt; setTimeout(r, 1000));
+  }
+}</pre>
+
+<p>An NDJSON reader with a reconnect loop. Two details do real work: the loop condition ties the reader's life to the session it was started for, so switching sessions retires the old reader; and the reconnect sets <code>startIndex = -1</code>, because a dropped connection must resume at the tail rather than replay the conversation.</p>
+
+<pre>function handle(event) {
+  switch (event.type) {
+    case "turn.started":      statusEl.textContent = "thinking"; break;
+    case "message.appended":  if (!live) live = bubble("it", "it", "");
+                              setMessage(live, data.messageSoFar || ""); break;
+    case "message.completed": if (data.message) setMessage(live ?? (live = bubble("it","it","")), data.message);
+                              live = null; void refreshMindlog(); break;
+    case "turn.failed":       bubble("it", "it", "[" + (data.message || "turn failed") + "]"); break;
+    case "turn.completed":
+    case "session.waiting":   statusEl.textContent = "idle"; void refreshMindlog(); break;
+  }
+}</pre>
+
+<div class="callout">
+  <span class="label">Key concept: cumulative deltas</span>
+  <p><code>message.appended</code> carries both <code>messageDelta</code> (the new characters) and <code>messageSoFar</code> (everything in this block). Rendering <code>messageSoFar</code> is idempotent, so a coalesced or replayed event cannot corrupt the text - whereas appending <code>messageDelta</code> would duplicate on replay. It also explains commit 6's discovery that one session's event store had grown to 2.6 GB: every delta stores the whole message so far, so a long reply is written repeatedly at growing length.</p>
+</div>
+
+<h3>Restoring history</h3>
+
+<pre>async function restore(id) {
+  const res = await fetch("/eve/v1/session/" + id + "/stream?startIndex=0&amp;includeTailIndex=1");
+  if (res.status === 409) {                  // session is gone
+    sessionId = null;
+    localStorage.removeItem("nys.session");
+    return;
+  }
+  … for each event:
+      if (event.type === "message.received")  bubble("me", "you", data.message);
+      else if (event.type === "message.completed" &amp;&amp; data.message) bubble("it", "it", data.message);
+  void follow(id, -1);                        // then go live
+}</pre>
+
+<p><code>includeTailIndex=1</code> asks for a catch-up read that ends rather than following, so this loop terminates on its own and hands over to <code>follow</code>. The whole of "chat history across refreshes" is these fifteen lines, and the reason it is that small is that the transcript was never the client's job.</p>
+
+<p>The <code>409</code> branch is the one piece of state reconciliation left. A stored session id can be dead - the store was wiped, the session timed out - and eve answers <code>{"code":"session_not_active"}</code>. The page drops the id and, on a send, retries once against <code>/eve/v1/session</code> so the message you typed still gets delivered into a fresh session rather than vanishing with an error.</p>
+
+<h3>Rendering markdown without letting it become markup</h3>
+
+<p>The model writes markdown, so the pane renders a small subset of it: paragraphs, bullets, numbered lists, headings, fenced code, and inline bold, italic and code. The safety property is structural rather than a sanitiser:</p>
+
+<pre>const node = document.createElement(tag);
+node.textContent = bold ?? italic ?? code;   // never innerHTML
+into.append(node);
+…
+if (at &lt; text.length) into.append(text.slice(at));   // plain text as text</pre>
+
+<p>Every piece of model output enters the DOM as a text node. There is no path by which a <code>&lt;script&gt;</code> in a reply becomes a script, because nothing is ever parsed as HTML.</p>
+
+<p>The mindlog pane keeps raw text on purpose. It is a log, and a log that reformats its contents is lying slightly: seeing <code>**bold**</code> as characters is the honest view of what was written to the file.</p>
+
+<h3>Smaller decisions, briefly</h3>
+
+<ul>
+  <li><strong>Theme.</strong> Light palette on bare <code>:root</code>, dark redefined under both <code>prefers-color-scheme</code> and <code>[data-theme="dark"]</code>, so an unstamped viewer follows the OS and the toggle wins in either direction. The saved choice is stamped in a <code>&lt;head&gt;</code> script before first paint to avoid a flash.</li>
+  <li><strong>Resizable panes.</strong> A 5px grip between the panes sets a CSS custom property, clamped so neither pane collapses, persisted to <code>localStorage</code>, and arrow-key adjustable for keyboard users. The drag listens on <code>window</code> rather than the grip, so a fast drag that outruns the pointer does not drop the gesture.</li>
+  <li><strong>Focus.</strong> Any printable key anywhere on the page focuses the composer, so you can just start typing. Modifier combos are left alone so copy still works, as are space and enter on a focused button so the toggle and Wake it still respond to the keyboard.</li>
+  <li><strong>Polling.</strong> The mindlog pane refetches every three seconds and on every turn boundary. Crude, and correct: the mindlog is written by hooks in a different session than the one the page is watching, so there is no event on this stream to trigger from.</li>
+</ul>
+
+<div class="callout warn">
+  <span class="label">What this commit does not fix</span>
+  <p>The built server refuses these requests. <code>localDev()</code> from commit 1 is ignored in production and <code>placeholderAuth()</code> denies browsers, so <code>npm start</code> serves the page and then answers <code>401 unauthorized</code> on <code>/eve/v1</code>. For a localhost-only daemon the fix is one line - <code>none()</code> - but it is a security decision, so it stays unmade and documented.</p>
+</div>
+
+<h2 id="quiz">Quiz</h2>
+
+<div class="quiz">
+  <div class="q" data-answer="b" data-explain="A stream opened with no cursor replays from the beginning, so the previous turn's events arrive first and get painted into the bubble just created. One long-lived reader plus an explicit cursor removes the whole class of bug.">
+    <span class="n">Question 1</span>
+    <p class="ask">Attaching a fresh stream on every send produced the previous answer appearing under the new question. Why?</p>
+    <button class="opt" data-key="a">Because <code>message.appended</code> carries a delta that had already been rendered.</button>
+    <button class="opt" data-key="b">Because a stream with no <code>startIndex</code> replays the session from the start, so old events arrived first and filled the new bubble.</button>
+    <button class="opt" data-key="c">Because two readers were open at once and interleaved.</button>
+    <button class="opt" data-key="d">Because the POST returns before the previous turn is cancelled.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="d" data-explain="eve durably records every event and can replay from an absolute cursor, so the server is the only source of truth. With no client-side transcript there is nothing to drift or duplicate.">
+    <span class="n">Question 2</span>
+    <p class="ask">Chat history survives a refresh with no client-side transcript. What makes that possible?</p>
+    <button class="opt" data-key="a">The page writes each bubble to <code>localStorage</code> as it renders.</button>
+    <button class="opt" data-key="b">The mindlog is replayed and filtered down to <code>heard</code> and <code>said</code> entries.</button>
+    <button class="opt" data-key="c">The service worker caches the NDJSON responses.</button>
+    <button class="opt" data-key="d">eve records every event durably and replays from an absolute cursor, so the server is the single source of truth.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="a" data-explain="Rendering messageSoFar is idempotent: replaying or coalescing an event repaints the same text. Appending messageDelta would duplicate characters on any replay.">
+    <span class="n">Question 3</span>
+    <p class="ask">Why render <code>messageSoFar</code> instead of appending <code>messageDelta</code>?</p>
+    <button class="opt" data-key="a">Because it is idempotent, so a replayed or coalesced event cannot corrupt the text.</button>
+    <button class="opt" data-key="b">Because <code>messageDelta</code> is only present on the final event of a block.</button>
+    <button class="opt" data-key="c">Because deltas arrive out of order across steps.</button>
+    <button class="opt" data-key="d">Because <code>messageSoFar</code> is smaller on the wire.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="c" data-explain="eve's framework default serves GET / from a source at channels/home.ts. Authoring that same path replaces the default; any other filename gets the route shadowed, with a compile warning.">
+    <span class="n">Question 4</span>
+    <p class="ask">The channel file has to be named <code>home.ts</code>. Why?</p>
+    <button class="opt" data-key="a">Because eve serves channels in alphabetical order and <code>home</code> sorts first.</button>
+    <button class="opt" data-key="b">Because a channel serving HTML must be named after its route.</button>
+    <button class="opt" data-key="c">Because the framework default that owns <code>GET /</code> lives at <code>channels/home.ts</code>, and authoring that path is how you replace it.</button>
+    <button class="opt" data-key="d">Because <code>from()</code> addresses are namespaced by channel filename.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="b" data-explain="Model text always enters the DOM through textContent or append(string), never innerHTML, so nothing in a reply is ever parsed as HTML. The renderer's structure is the safety property.">
+    <span class="n">Question 5</span>
+    <p class="ask">The chat pane renders markdown from the model. What stops a reply containing <code>&lt;script&gt;</code> from executing?</p>
+    <button class="opt" data-key="a">A regex strips angle brackets before rendering.</button>
+    <button class="opt" data-key="b">Every piece of model text enters the DOM as a text node; <code>innerHTML</code> is never used on it.</button>
+    <button class="opt" data-key="c">A Content-Security-Policy header blocks inline scripts.</button>
+    <button class="opt" data-key="d">eve escapes assistant messages before they reach the stream.</button>
+    <div class="fb"></div>
+  </div>
+</div>
+
+<div class="score" id="score">Answer a question to start scoring.</div>
+
+<p style="margin-top:3rem; color:var(--dim); font-size:.9rem">Next: the last commit measures what actually survives a wipe, and closes the gap that measurement exposes.</p>
+</div>
+<script>
+let answered = 0;
+let correct = 0;
+const total = document.querySelectorAll(".q").length;
+
+document.querySelectorAll(".q").forEach((q) => {
+  const answer = q.dataset.answer;
+  q.querySelectorAll(".opt").forEach((opt) => {
+    opt.addEventListener("click", () => {
+      const chosen = opt.dataset.key;
+      q.querySelectorAll(".opt").forEach((o) => {
+        o.disabled = true;
+        if (o.dataset.key === answer) o.classList.add("right");
+        else if (o.dataset.key === chosen) o.classList.add("wrong");
+      });
+      answered += 1;
+      if (chosen === answer) correct += 1;
+      const fb = q.querySelector(".fb");
+      fb.textContent = (chosen === answer ? "Correct. " : "Not quite. ") + q.dataset.explain;
+      fb.classList.add("show");
+      const score = document.getElementById("score");
+      if (score) {
+        score.textContent = correct + " of " + answered + " right" +
+          (answered === total ? ". That is the whole set." : ", " + (total - answered) + " to go.");
+      }
+    });
+  });
+});
+</script>
+</body>
+</html>

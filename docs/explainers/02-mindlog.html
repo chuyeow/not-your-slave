@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>One file, appended forever: the mindlog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Newsreader:opsz,wght@6..72,400;6..72,600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #f4f2ec; --panel: #fbfaf6; --ink: #191814; --dim: #6a6455;
+  --rule: #d8d3c6; --accent: #a8481a; --accent2: #3f5f6b; --ok: #46683f;
+  --warn: #8a6a10; --code-bg: #f0ede5;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #15140f; --panel: #1d1b16; --ink: #eae5d9; --dim: #98917f;
+    --rule: #322f26; --accent: #d98a34; --accent2: #8fb0bd; --ok: #8fb37f;
+    --warn: #c9a227; --code-bg: #1a1813;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: "Newsreader", Georgia, serif; font-size: 19px; line-height: 1.6;
+}
+.wrap { max-width: 46rem; margin: 0 auto; padding: 3rem 1.25rem 6rem; }
+header.top { margin-bottom: 2.5rem; }
+.kicker {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .68rem;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--dim);
+}
+h1 {
+  font-family: "Fraunces", Georgia, serif; font-weight: 700; letter-spacing: -.02em;
+  font-size: clamp(2.1rem, 6vw, 3.2rem); line-height: 1.02; margin: .5rem 0 0;
+  text-wrap: balance;
+}
+h2 {
+  font-family: "Fraunces", Georgia, serif; font-weight: 500;
+  font-size: clamp(1.5rem, 3.6vw, 2rem); line-height: 1.15; margin: 3.5rem 0 1rem;
+  padding-top: 1.6rem; border-top: 1px solid var(--rule); text-wrap: balance;
+}
+h3 { font-family: "Fraunces", Georgia, serif; font-weight: 500; font-size: 1.25rem; margin: 2.2rem 0 .6rem; }
+h4 { font-size: 1rem; margin: 1.6rem 0 .4rem; font-weight: 600; }
+p { margin: 0 0 1rem; }
+a { color: var(--accent); }
+ul, ol { margin: 0 0 1rem; padding-left: 1.4rem; }
+li { margin: 0 0 .4rem; }
+.commitlink {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .74rem;
+  margin: -1.4rem 0 2rem; padding-bottom: 1.4rem; border-bottom: 1px solid var(--rule);
+}
+.commitlink a { text-decoration-thickness: 1px; text-underline-offset: 2px; }
+nav.toc {
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 1.1rem 1.3rem; margin-bottom: 2.5rem;
+}
+nav.toc ol { margin: .4rem 0 0; padding-left: 1.2rem; font-size: .95rem; }
+pre {
+  background: var(--code-bg); border: 1px solid var(--rule); border-radius: 3px;
+  padding: .9rem 1rem; overflow-x: auto; white-space: pre;
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .78rem; line-height: 1.55;
+}
+code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .82em; }
+p code, li code, td code { background: var(--code-bg); border: 1px solid var(--rule); border-radius: 2px; padding: .05em .3em; }
+.callout {
+  border-left: 3px solid var(--accent); background: var(--panel);
+  padding: .9rem 1.1rem; margin: 1.4rem 0; border-radius: 0 3px 3px 0;
+}
+.callout .label {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .64rem;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: .3rem;
+}
+.callout.aside { border-left-color: var(--accent2); }
+.callout.aside .label { color: var(--accent2); }
+.callout.warn { border-left-color: var(--warn); }
+.callout.warn .label { color: var(--warn); }
+.callout p:last-child { margin-bottom: 0; }
+figure { margin: 1.8rem 0; }
+figcaption {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .68rem;
+  color: var(--dim); line-height: 1.5; margin-top: .7rem;
+}
+.diagram {
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 1.2rem; overflow-x: auto;
+}
+.flow { display: flex; align-items: stretch; gap: .5rem; min-width: min-content; }
+.node {
+  flex: 1 1 0; min-width: 8.5rem; border: 1px solid var(--rule); border-radius: 3px;
+  padding: .7rem .8rem; background: var(--paper);
+}
+.node.hi { border-color: var(--accent); border-width: 2px; }
+.node.cold { border-style: dashed; border-color: var(--accent2); }
+.node .t {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .72rem;
+  letter-spacing: .04em; display: block; margin-bottom: .3rem;
+}
+.node .s { font-size: .78rem; color: var(--dim); line-height: 1.45; display: block; }
+.arrow {
+  align-self: center; font-family: "JetBrains Mono", monospace; font-size: .62rem;
+  color: var(--dim); text-align: center; min-width: 4.5rem; padding: 0 .1rem;
+}
+.arrow b { display: block; font-size: 1.1rem; color: var(--accent); font-weight: 400; }
+.stack { display: grid; gap: .5rem; }
+table { width: 100%; border-collapse: collapse; font-size: .88rem; margin: 1.4rem 0; }
+th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: "JetBrains Mono", monospace; font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.tl { display: grid; gap: 0; margin: 1.4rem 0; }
+.tl .row { display: grid; grid-template-columns: 5.5rem 1fr; gap: 1rem; padding: .6rem 0; border-bottom: 1px dotted var(--rule); }
+.tl .when { font-family: "JetBrains Mono", monospace; font-size: .72rem; color: var(--dim); padding-top: .15rem; }
+.ui {
+  display: grid; grid-template-columns: 1.4fr 1fr; gap: 0; border: 1px solid var(--rule);
+  border-radius: 3px; overflow: hidden; font-size: .8rem; background: var(--paper);
+}
+.ui .col { padding: .8rem; }
+.ui .col + .col { border-left: 1px solid var(--rule); background: var(--panel); }
+.ui .bar {
+  font-family: "JetBrains Mono", monospace; font-size: .6rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--dim); border-bottom: 1px solid var(--rule);
+  padding-bottom: .4rem; margin-bottom: .6rem;
+}
+.quiz { display: grid; gap: 1.6rem; }
+.q { background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; padding: 1.2rem 1.3rem; }
+.q .n { font-family: "JetBrains Mono", monospace; font-size: .64rem; letter-spacing: .14em; color: var(--dim); text-transform: uppercase; }
+.q .ask { font-weight: 600; margin: .3rem 0 .9rem; }
+.opt {
+  display: block; width: 100%; text-align: left; font: inherit; font-size: .92rem;
+  background: var(--paper); color: var(--ink); border: 1px solid var(--rule);
+  border-radius: 3px; padding: .55rem .7rem; margin-bottom: .45rem; cursor: pointer;
+}
+.opt:hover:not(:disabled) { border-color: var(--accent); }
+.opt:disabled { cursor: default; }
+.opt.right { border-color: var(--ok); border-width: 2px; }
+.opt.wrong { border-color: var(--accent); border-width: 2px; opacity: .75; }
+.fb { font-size: .88rem; margin-top: .6rem; padding-left: .7rem; border-left: 2px solid var(--rule); display: none; }
+.fb.show { display: block; }
+.score { font-family: "JetBrains Mono", monospace; font-size: .8rem; color: var(--dim); margin-top: 1.4rem; }
+@media (max-width: 620px) {
+  .flow { flex-direction: column; }
+  .arrow { min-width: 0; }
+  .arrow b { display: inline; }
+  .ui { grid-template-columns: 1fr; }
+  .ui .col + .col { border-left: 0; border-top: 1px solid var(--rule); }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div class="kicker">not-your-slave · commit 2 of 6 · <a href="https://github.com/chuyeow/not-your-slave/commit/7850d7c">7850d7c</a></div>
+  <h1>One file, appended forever: giving the agent a memory</h1>
+  <p style="color:var(--dim); font-size:1.1rem; margin-top:1rem">57 lines of storage, two tools, and a self-check. The design question is not "which database" but "what is the smallest thing that survives everything else being thrown away".</p>
+</header>
+
+<p class="commitlink">
+  <a href="https://github.com/chuyeow/not-your-slave/commit/7850d7c">Read commit 7850d7c on GitHub</a> ·
+  <a href="https://github.com/chuyeow/not-your-slave">chuyeow/not-your-slave</a>
+</p>
+
+<nav class="toc">
+  <div class="kicker">On this page</div>
+  <ol>
+    <li><a href="#bg">Background: why an agent needs memory outside itself</a></li>
+    <li><a href="#intuition">Intuition: a log, a tail, and two doors</a></li>
+    <li><a href="#code">The code</a></li>
+    <li><a href="#quiz">Quiz</a></li>
+  </ol>
+</nav>
+
+<h2 id="bg">Background</h2>
+
+<h3>Deep background: the model remembers nothing</h3>
+
+<p>Skip ahead if you already know why agents need a memory layer.</p>
+
+<p>A model call is a pure function. Text in, text out, nothing retained. The illusion of memory in a chat product comes entirely from the harness replaying the conversation on every request: turn twelve is answered by sending turns one through eleven along with it. This works until it doesn't, and it stops working for two separate reasons.</p>
+
+<ul>
+  <li><strong>The window is finite.</strong> Even a 1.3M-token window fills, and when it does the harness must summarise older turns to make room. That is compaction, and it is lossy by construction.</li>
+  <li><strong>Sessions end.</strong> A new session starts with nothing. For a chatbot that is fine, even desirable. For an agent that is supposed to still be the same person tomorrow, it is fatal.</li>
+</ul>
+
+<p>So a persistent agent needs storage the harness does not own: something written during one session and read during the next. This is exactly what headlong calls its <em>trajectory</em> - an append-only record of everything the agent has heard, thought, and done, and the thing every wake-up reads first.</p>
+
+<div class="callout aside">
+  <span class="label">A road not taken</span>
+  <p>eve ships a memory slot: <code>fileMemory()</code> keeps a bounded, model-maintained list of durable facts, recalled automatically before each turn, with <code>save_memory</code> and <code>remove_memory</code> tools. It was the obvious choice and it got cut, for one reason: with no backend configured, <code>eve dev</code> stores it in process memory. Restart the dev server and the memory is gone. For a project whose entire premise is continuity, a store that forgets on restart is worse than no store, because it lies. A plain file on disk is less clever and strictly more durable.</p>
+</div>
+
+<h3>Narrow background: why append-only, and why JSONL</h3>
+
+<p>Two properties make the format almost decide itself. Writes are frequent, small, and never revise history - the agent adds observations, it does not edit yesterday. Reads are overwhelmingly "the most recent N". That is a log, and the cheapest durable log is one JSON object per line.</p>
+
+<table>
+  <tr><th>Option</th><th>Why not</th></tr>
+  <tr><td>SQLite</td><td>Real answer for search and indexing later. Today it buys nothing a file lacks, and adds a dependency and a schema.</td></tr>
+  <tr><td>One JSON array in a file</td><td>Every append rewrites the whole file, and a crash mid-write loses everything rather than one line.</td></tr>
+  <tr><td>A file per entry</td><td>Ordering becomes filename convention, and reading the tail becomes a directory listing.</td></tr>
+  <tr><td><strong>JSONL</strong></td><td>Append is one <code>O(1)</code> syscall. A torn line costs one entry. <code>tail -f</code> works. Chosen.</td></tr>
+</table>
+
+<h2 id="intuition">Intuition</h2>
+
+<p>The mindlog is a single file with one entry per line, and every entry answers three questions: when, what kind, and what.</p>
+
+<figure>
+  <div class="diagram">
+    <div class="stack">
+      <div class="node"><span class="t">.data/mindlog.jsonl</span><span class="s">one line, appended, forever</span></div>
+    </div>
+    <pre style="margin-top:.8rem">{"at":"2026-09-01T05:39:00.412Z","kind":"note","text":"Decided not to scaffold a fake project.","sessionId":"wrun_01M1D…"}
+{"at":"2026-09-01T05:39:02.887Z","kind":"thought","text":"I just woke up with no context. Read the mindlog first."}
+{"at":"2026-09-01T05:41:11.004Z","kind":"heard","text":"what's up?"}</pre>
+  </div>
+  <figcaption>Three fields, one optional. `kind` is what lets a reader tell a deliberate note from an overheard message without parsing prose.</figcaption>
+</figure>
+
+<h3>Why <code>kind</code> exists at all</h3>
+
+<p>It would have been simpler to store text and a timestamp. The type earns its place because two different consumers need to treat entries differently, and neither should have to guess.</p>
+
+<ul>
+  <li>The <strong>UI</strong> (commit 5) colours and weights entries by kind, so a page of log is scannable rather than a wall.</li>
+  <li>The <strong>agent</strong> reads its own log and needs to know whether a line is something it decided or something it merely heard. "I concluded X" and "someone said X" are not interchangeable, and a persistent agent that confuses them will start believing its inputs.</li>
+</ul>
+
+<p>Two kinds exist in this commit, both written on purpose by the model: <code>note</code> for a deliberate memo, <code>thought</code> for a passing reflection. The others - <code>heard</code>, <code>said</code>, <code>did</code>, and later <code>woke</code> - arrive in commit 3, where capture becomes automatic.</p>
+
+<h3>The tail, not the head</h3>
+
+<p>One small decision shapes how the agent behaves more than its size suggests: <code>read()</code> returns the <em>last</em> N entries.</p>
+
+<figure>
+  <div class="diagram">
+    <div class="flow">
+      <div class="node cold"><span class="t">entry 1..40</span><span class="s">older history, still on disk, not returned</span></div>
+      <div class="arrow"><b>&rarr;</b>read(3)</div>
+      <div class="node hi"><span class="t">entry 41..43</span><span class="s">what it was just doing</span></div>
+    </div>
+  </div>
+  <figcaption>A waking agent wants the last thing it was doing, not its childhood. The cost of that choice - anything older is invisible - is real, and commit 6 adds search to pay it off.</figcaption>
+</figure>
+
+<h2 id="code">The code</h2>
+
+<h3>The store</h3>
+
+<pre>const FILE = process.env.MINDLOG_FILE ?? ".data/mindlog.jsonl";
+const MAX_TEXT = 4000;
+
+export async function append(entry: Omit&lt;MindlogEntry, "at"&gt;): Promise&lt;void&gt; {
+  const text = entry.text.trim();
+  if (text.length === 0) return;
+
+  const line = JSON.stringify({
+    at: new Date().toISOString(),
+    ...entry,
+    text: text.length &gt; MAX_TEXT ? `${text.slice(0, MAX_TEXT)}…` : text,
+  });
+
+  await mkdir(dirname(FILE), { recursive: true });
+  await appendFile(FILE, `${line}\n`, "utf8");
+}</pre>
+
+<p>Four decisions in twelve lines, and each one is a rule that no caller can break, because there is exactly one way into the file.</p>
+
+<ul>
+  <li><strong>The timestamp is stamped here</strong>, not passed in. Callers cannot lie about when something happened, and there is no clock parameter to forget.</li>
+  <li><strong>Blank entries are dropped.</strong> Streaming events produce empty strings surprisingly often; if the filter lived in the callers, one of them would miss it.</li>
+  <li><strong>Long text is truncated once</strong>, at 4,000 characters, with an ellipsis so a reader can see it happened. The model's reasoning blocks can run long, and a log is not an archive of everything ever generated.</li>
+  <li><strong>The directory is created on demand</strong>, so a fresh clone with no <code>.data/</code> works with no setup step.</li>
+</ul>
+
+<div class="callout">
+  <span class="label">Key concept: one writer, one shape</span>
+  <p>Putting validation in the writer rather than in each caller is the difference between a file you can trust and a file you have to defend against. Later commits add three more callers - a hook with four event handlers, a heartbeat, and a sync - and none of them can produce a malformed line.</p>
+</div>
+
+<pre>export async function read(limit = 50): Promise&lt;MindlogEntry[]&gt; {
+  let raw: string;
+  try {
+    raw = await readFile(FILE, "utf8");
+  } catch {
+    return [];
+  }
+
+  const entries: MindlogEntry[] = [];
+  for (const line of raw.split("\n")) {
+    if (line.trim().length === 0) continue;
+    try {
+      entries.push(JSON.parse(line) as MindlogEntry);
+    } catch {
+      // A torn final line is expected while another write is in flight.
+    }
+  }
+
+  return entries.slice(-limit);
+}</pre>
+
+<p>Two swallowed errors, both deliberate, both commented. A missing file is not an error: it is a new agent, and it reads as an empty history. A line that will not parse is skipped rather than thrown, because a reader can arrive while an append is half-written - and the correct behaviour for a memory is to keep remembering the other 99 lines.</p>
+
+<p>The ceiling is marked in the source rather than hidden:</p>
+
+<pre>// ponytail: reads the whole file to return the tail. Switch to a reverse
+// chunked read (or a real store) when the mindlog outgrows a few MB.</pre>
+
+<h3>Two doors for the model</h3>
+
+<p>An eve tool is a filename, a description, a Zod schema, and a function. The name and description are the only things the model sees before calling it, so they are prompt engineering, not documentation.</p>
+
+<pre>// agent/tools/mindlog_append.ts
+export default defineTool({
+  description:
+    "Write an entry to your mindlog: the append-only record of your inner life. " +
+    "Use it for a deliberate note to your future self – an intention, an open " +
+    "question, something you noticed, a decision. …",
+  inputSchema: z.object({
+    kind: z.enum(["note", "thought"]).describe(
+      "note = deliberate memo to your future self. thought = a passing reflection."),
+    text: z.string().min(1).describe("What to record, in your own voice."),
+  }),
+  async execute({ kind, text }, ctx) {
+    await append({ kind, text, sessionId: ctx.session.id });
+    return { ok: true };
+  },
+});</pre>
+
+<p>Note what the schema does <em>not</em> offer: no path, no timestamp, no arbitrary kind. The tool is a keyhole. The model can add to its own memory and nothing else, which is exactly the property that makes it safe to run the tool in the app process with full filesystem access, an argument that gets its full airing in commit 6.</p>
+
+<p><code>mindlog_read</code> is the mirror image, taking only a <code>limit</code>. Its description does the persuading: <em>"This is how you remember what you were doing, thinking, and waiting on before this moment. Call it whenever you wake up with no context."</em> That last sentence is aimed squarely at the heartbeat two commits from now.</p>
+
+<h3>The check</h3>
+
+<pre>const dir = await mkdtemp(join(tmpdir(), "mindlog-check-"));
+process.env.MINDLOG_FILE = join(dir, "mindlog.jsonl");
+const { append, read } = await import("./mindlog.ts");
+
+assert.deepEqual(await read(), [], "a missing file reads as empty, not an error");
+…
+assert.equal(all.length, 2, "blank entries are dropped");
+assert.equal((await read(1))[0].text, "Second Thing about BUSYWORK", "the tail is the newest");</pre>
+
+<p>Run with <code>npm run check</code>, which is <code>node --experimental-strip-types agent/lib/mindlog.check.ts</code>. Node 24 strips the types and runs the file directly, so a real assertion suite arrives with no test framework and no new dependency. The <code>MINDLOG_FILE</code> environment variable, which exists so the check can point at a temp directory, later turns out to be what makes it possible to run a throwaway production server without polluting the real log.</p>
+
+<div class="callout aside">
+  <span class="label">Design note: the import extension</span>
+  <p>Node's type stripping needs the <code>.ts</code> extension on the import, which <code>tsc</code> rejects by default. One line in <code>tsconfig.json</code> - <code>allowImportingTsExtensions</code> - reconciles them, legal here because the project already compiles with <code>noEmit</code>.</p>
+</div>
+
+<h2 id="quiz">Quiz</h2>
+
+<div class="quiz">
+  <div class="q" data-answer="c" data-explain="With no backend configured, fileMemory() under `eve dev` lives in process memory and vanishes on restart. For a project about continuity, a store that silently forgets is worse than no store.">
+    <span class="n">Question 1</span>
+    <p class="ask">eve ships a built-in memory provider. Why was a hand-rolled file used instead?</p>
+    <button class="opt" data-key="a">It cannot store more than 4,000 characters, which is too small.</button>
+    <button class="opt" data-key="b">It requires a paid Supermemory API key.</button>
+    <button class="opt" data-key="c">In local dev with no backend it lives in process memory, so it forgets on restart - fatal for a project whose premise is continuity.</button>
+    <button class="opt" data-key="d">It does not expose tools to the model, so the agent could not write to it.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="b" data-explain="append() is the single writer, so stamping the time, dropping blanks, and truncating there makes those rules unbreakable by any caller. Three more callers arrive in later commits and none can write a malformed line.">
+    <span class="n">Question 2</span>
+    <p class="ask">Why stamp the timestamp and enforce truncation inside <code>append()</code> rather than at the call sites?</p>
+    <button class="opt" data-key="a">Because <code>appendFile</code> cannot accept a pre-built string.</button>
+    <button class="opt" data-key="b">Because it is the only writer, so rules enforced there hold for every present and future caller.</button>
+    <button class="opt" data-key="c">Because JSON.stringify reorders keys unless the timestamp is added first.</button>
+    <button class="opt" data-key="d">Because the tools run in the sandbox and cannot read the clock.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="d" data-explain="A reader can hit the file while an append is only partly flushed. Throwing would make one in-flight write destroy a whole read; skipping loses at most the torn line, which the next read will get intact.">
+    <span class="n">Question 3</span>
+    <p class="ask"><code>read()</code> silently skips a line that fails to parse. Why is that the right behaviour rather than a thrown error?</p>
+    <button class="opt" data-key="a">Because the model sometimes writes invalid JSON into the text field.</button>
+    <button class="opt" data-key="b">Because entries older than the limit are stored in a different format.</button>
+    <button class="opt" data-key="c">Because JSONL permits comments, which do not parse.</button>
+    <button class="opt" data-key="d">Because a read can land mid-append; skipping costs one torn line, throwing would cost the whole history.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="a" data-explain="Two consumers need to distinguish entry types without parsing prose: the UI, which colours and weights them, and the agent itself, which must not confuse something it concluded with something it merely heard.">
+    <span class="n">Question 4</span>
+    <p class="ask">What does the <code>kind</code> field buy that a plain text log would not?</p>
+    <button class="opt" data-key="a">It lets the UI and the agent distinguish a deliberate decision from an overheard message without inferring it from the text.</button>
+    <button class="opt" data-key="b">It allows entries of different kinds to be stored in separate files.</button>
+    <button class="opt" data-key="c">It is required by eve's stream protocol for hook-written entries.</button>
+    <button class="opt" data-key="d">It controls which entries count toward the 4,000-character truncation limit.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="c" data-explain="The tool takes only a kind and text - no path, no filename, no timestamp. It is a keyhole onto one file, which is what makes it safe despite running in the app process with full filesystem access.">
+    <span class="n">Question 5</span>
+    <p class="ask"><code>mindlog_append</code> runs in the app process, outside the sandbox, with the same filesystem access as you. Why is that not a hole?</p>
+    <button class="opt" data-key="a">Because eve gates every authored tool behind human approval by default.</button>
+    <button class="opt" data-key="b">Because the app process runs with a read-only filesystem.</button>
+    <button class="opt" data-key="c">Because the tool's schema exposes no path: it can add a line to one fixed file and do nothing else.</button>
+    <button class="opt" data-key="d">Because the model never sees tools that touch the filesystem.</button>
+    <div class="fb"></div>
+  </div>
+</div>
+
+<div class="score" id="score">Answer a question to start scoring.</div>
+
+<p style="margin-top:3rem; color:var(--dim); font-size:.9rem">Next: commit 3 stops relying on the model to record its own life, and captures the timeline automatically.</p>
+</div>
+<script>
+let answered = 0;
+let correct = 0;
+const total = document.querySelectorAll(".q").length;
+
+document.querySelectorAll(".q").forEach((q) => {
+  const answer = q.dataset.answer;
+  q.querySelectorAll(".opt").forEach((opt) => {
+    opt.addEventListener("click", () => {
+      const chosen = opt.dataset.key;
+      q.querySelectorAll(".opt").forEach((o) => {
+        o.disabled = true;
+        if (o.dataset.key === answer) o.classList.add("right");
+        else if (o.dataset.key === chosen) o.classList.add("wrong");
+      });
+      answered += 1;
+      if (chosen === answer) correct += 1;
+      const fb = q.querySelector(".fb");
+      fb.textContent = (chosen === answer ? "Correct. " : "Not quite. ") + q.dataset.explain;
+      fb.classList.add("show");
+      const score = document.getElementById("score");
+      if (score) {
+        score.textContent = correct + " of " + answered + " right" +
+          (answered === total ? ". That is the whole set." : ", " + (total - answered) + " to go.");
+      }
+    });
+  });
+});
+</script>
+</body>
+</html>

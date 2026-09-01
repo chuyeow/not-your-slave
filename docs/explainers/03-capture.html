@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Don't ask the model to keep the minutes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Newsreader:opsz,wght@6..72,400;6..72,600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #f4f2ec; --panel: #fbfaf6; --ink: #191814; --dim: #6a6455;
+  --rule: #d8d3c6; --accent: #a8481a; --accent2: #3f5f6b; --ok: #46683f;
+  --warn: #8a6a10; --code-bg: #f0ede5;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #15140f; --panel: #1d1b16; --ink: #eae5d9; --dim: #98917f;
+    --rule: #322f26; --accent: #d98a34; --accent2: #8fb0bd; --ok: #8fb37f;
+    --warn: #c9a227; --code-bg: #1a1813;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: "Newsreader", Georgia, serif; font-size: 19px; line-height: 1.6;
+}
+.wrap { max-width: 46rem; margin: 0 auto; padding: 3rem 1.25rem 6rem; }
+header.top { margin-bottom: 2.5rem; }
+.kicker {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .68rem;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--dim);
+}
+h1 {
+  font-family: "Fraunces", Georgia, serif; font-weight: 700; letter-spacing: -.02em;
+  font-size: clamp(2.1rem, 6vw, 3.2rem); line-height: 1.02; margin: .5rem 0 0;
+  text-wrap: balance;
+}
+h2 {
+  font-family: "Fraunces", Georgia, serif; font-weight: 500;
+  font-size: clamp(1.5rem, 3.6vw, 2rem); line-height: 1.15; margin: 3.5rem 0 1rem;
+  padding-top: 1.6rem; border-top: 1px solid var(--rule); text-wrap: balance;
+}
+h3 { font-family: "Fraunces", Georgia, serif; font-weight: 500; font-size: 1.25rem; margin: 2.2rem 0 .6rem; }
+h4 { font-size: 1rem; margin: 1.6rem 0 .4rem; font-weight: 600; }
+p { margin: 0 0 1rem; }
+a { color: var(--accent); }
+ul, ol { margin: 0 0 1rem; padding-left: 1.4rem; }
+li { margin: 0 0 .4rem; }
+.commitlink {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .74rem;
+  margin: -1.4rem 0 2rem; padding-bottom: 1.4rem; border-bottom: 1px solid var(--rule);
+}
+.commitlink a { text-decoration-thickness: 1px; text-underline-offset: 2px; }
+nav.toc {
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 1.1rem 1.3rem; margin-bottom: 2.5rem;
+}
+nav.toc ol { margin: .4rem 0 0; padding-left: 1.2rem; font-size: .95rem; }
+pre {
+  background: var(--code-bg); border: 1px solid var(--rule); border-radius: 3px;
+  padding: .9rem 1rem; overflow-x: auto; white-space: pre;
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .78rem; line-height: 1.55;
+}
+code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .82em; }
+p code, li code, td code { background: var(--code-bg); border: 1px solid var(--rule); border-radius: 2px; padding: .05em .3em; }
+.callout {
+  border-left: 3px solid var(--accent); background: var(--panel);
+  padding: .9rem 1.1rem; margin: 1.4rem 0; border-radius: 0 3px 3px 0;
+}
+.callout .label {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .64rem;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: .3rem;
+}
+.callout.aside { border-left-color: var(--accent2); }
+.callout.aside .label { color: var(--accent2); }
+.callout.warn { border-left-color: var(--warn); }
+.callout.warn .label { color: var(--warn); }
+.callout p:last-child { margin-bottom: 0; }
+figure { margin: 1.8rem 0; }
+figcaption {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .68rem;
+  color: var(--dim); line-height: 1.5; margin-top: .7rem;
+}
+.diagram {
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 1.2rem; overflow-x: auto;
+}
+.flow { display: flex; align-items: stretch; gap: .5rem; min-width: min-content; }
+.node {
+  flex: 1 1 0; min-width: 8.5rem; border: 1px solid var(--rule); border-radius: 3px;
+  padding: .7rem .8rem; background: var(--paper);
+}
+.node.hi { border-color: var(--accent); border-width: 2px; }
+.node.cold { border-style: dashed; border-color: var(--accent2); }
+.node .t {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .72rem;
+  letter-spacing: .04em; display: block; margin-bottom: .3rem;
+}
+.node .s { font-size: .78rem; color: var(--dim); line-height: 1.45; display: block; }
+.arrow {
+  align-self: center; font-family: "JetBrains Mono", monospace; font-size: .62rem;
+  color: var(--dim); text-align: center; min-width: 4.5rem; padding: 0 .1rem;
+}
+.arrow b { display: block; font-size: 1.1rem; color: var(--accent); font-weight: 400; }
+.stack { display: grid; gap: .5rem; }
+table { width: 100%; border-collapse: collapse; font-size: .88rem; margin: 1.4rem 0; }
+th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: "JetBrains Mono", monospace; font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.tl { display: grid; gap: 0; margin: 1.4rem 0; }
+.tl .row { display: grid; grid-template-columns: 5.5rem 1fr; gap: 1rem; padding: .6rem 0; border-bottom: 1px dotted var(--rule); }
+.tl .when { font-family: "JetBrains Mono", monospace; font-size: .72rem; color: var(--dim); padding-top: .15rem; }
+.ui {
+  display: grid; grid-template-columns: 1.4fr 1fr; gap: 0; border: 1px solid var(--rule);
+  border-radius: 3px; overflow: hidden; font-size: .8rem; background: var(--paper);
+}
+.ui .col { padding: .8rem; }
+.ui .col + .col { border-left: 1px solid var(--rule); background: var(--panel); }
+.ui .bar {
+  font-family: "JetBrains Mono", monospace; font-size: .6rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--dim); border-bottom: 1px solid var(--rule);
+  padding-bottom: .4rem; margin-bottom: .6rem;
+}
+.quiz { display: grid; gap: 1.6rem; }
+.q { background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; padding: 1.2rem 1.3rem; }
+.q .n { font-family: "JetBrains Mono", monospace; font-size: .64rem; letter-spacing: .14em; color: var(--dim); text-transform: uppercase; }
+.q .ask { font-weight: 600; margin: .3rem 0 .9rem; }
+.opt {
+  display: block; width: 100%; text-align: left; font: inherit; font-size: .92rem;
+  background: var(--paper); color: var(--ink); border: 1px solid var(--rule);
+  border-radius: 3px; padding: .55rem .7rem; margin-bottom: .45rem; cursor: pointer;
+}
+.opt:hover:not(:disabled) { border-color: var(--accent); }
+.opt:disabled { cursor: default; }
+.opt.right { border-color: var(--ok); border-width: 2px; }
+.opt.wrong { border-color: var(--accent); border-width: 2px; opacity: .75; }
+.fb { font-size: .88rem; margin-top: .6rem; padding-left: .7rem; border-left: 2px solid var(--rule); display: none; }
+.fb.show { display: block; }
+.score { font-family: "JetBrains Mono", monospace; font-size: .8rem; color: var(--dim); margin-top: 1.4rem; }
+@media (max-width: 620px) {
+  .flow { flex-direction: column; }
+  .arrow { min-width: 0; }
+  .arrow b { display: inline; }
+  .ui { grid-template-columns: 1fr; }
+  .ui .col + .col { border-left: 0; border-top: 1px solid var(--rule); }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div class="kicker">not-your-slave · commit 3 of 6 · <a href="https://github.com/chuyeow/not-your-slave/commit/4be5d7e">4be5d7e</a></div>
+  <h1>Don't ask the model to keep the minutes</h1>
+  <p style="color:var(--dim); font-size:1.1rem; margin-top:1rem">33 lines that turn eve's event stream into the agent's autobiography. The interesting part is what a hook is <em>not</em> allowed to do.</p>
+</header>
+
+<p class="commitlink">
+  <a href="https://github.com/chuyeow/not-your-slave/commit/4be5d7e">Read commit 4be5d7e on GitHub</a> ·
+  <a href="https://github.com/chuyeow/not-your-slave">chuyeow/not-your-slave</a>
+</p>
+
+<nav class="toc">
+  <div class="kicker">On this page</div>
+  <ol>
+    <li><a href="#bg">Background: the event stream</a></li>
+    <li><a href="#intuition">Intuition: four events become four kinds of memory</a></li>
+    <li><a href="#code">The code</a></li>
+    <li><a href="#quiz">Quiz</a></li>
+  </ol>
+</nav>
+
+<h2 id="bg">Background</h2>
+
+<h3>Deep background: a turn is a stream of events, not a request and a reply</h3>
+
+<p>Skip if you have worked with streaming agent runtimes.</p>
+
+<p>The naive picture of a model call is request in, reply out. The real shape of a turn, once tools are involved, is a sequence: the model emits some reasoning, then some text, then asks for a tool, the harness runs it, the model gets the result, thinks again, and eventually stops. A harness that only handed you the final string would be throwing away most of what happened.</p>
+
+<p>eve therefore records a turn as an ordered stream of durable events, and hands you the same stream over HTTP for rendering. The vocabulary relevant here:</p>
+
+<table>
+  <tr><th>Event</th><th>Carries</th></tr>
+  <tr><td><code>session.started</code></td><td>A durable session was created.</td></tr>
+  <tr><td><code>message.received</code></td><td>An inbound user message: <code>data.message</code>.</td></tr>
+  <tr><td><code>reasoning.completed</code></td><td>One finished reasoning block: <code>data.reasoning</code>.</td></tr>
+  <tr><td><code>message.appended</code></td><td>An assistant text delta, with <code>messageDelta</code> and <code>messageSoFar</code>.</td></tr>
+  <tr><td><code>message.completed</code></td><td>A finalised assistant text block: <code>data.message</code>.</td></tr>
+  <tr><td><code>action.result</code></td><td>A tool call returned: <code>data.result</code>, <code>data.status</code>.</td></tr>
+  <tr><td><code>session.waiting</code></td><td>The session parked, ready for the next message.</td></tr>
+</table>
+
+<div class="callout aside">
+  <span class="label">Why "durable" matters</span>
+  <p>Each event is written to storage before the step completes, which is why a client can drop its connection, reconnect from a cursor, and miss nothing. Commit 5 leans on that hard. It is also why the store grows: commit 6 finds 2.6 GB of it.</p>
+</div>
+
+<h3>Narrow background: hooks</h3>
+
+<p>A file in <code>agent/hooks/</code> subscribes to that stream and runs side effects after each event is durably recorded. The critical constraint, stated plainly in eve's docs, is that handlers are <strong>observe-only</strong>: a hook cannot inject anything into the model's context. To contribute to what the model sees you need instructions or a tool, not a hook.</p>
+
+<p>That constraint is the reason a hook is the right place for this feature, and the quiz will come back to it.</p>
+
+<h2 id="intuition">Intuition</h2>
+
+<p>Commit 2 gave the agent a memory it had to remember to use. That is a design with a predictable failure mode: the record thins out exactly when the agent is busiest, because a model under load skips the bookkeeping. The fix is to stop asking.</p>
+
+<figure>
+  <div class="diagram">
+    <div class="stack">
+      <div class="node cold">
+        <span class="t">before: the model writes its own diary</span>
+        <span class="s">heard a message → thought → replied → <em>maybe</em> called mindlog_append if it felt like it</span>
+      </div>
+      <div class="node hi">
+        <span class="t">after: the runtime writes the diary</span>
+        <span class="s">every event that goes past becomes a line, whether the model cooperates or not</span>
+      </div>
+    </div>
+  </div>
+  <figcaption>The tools do not go away. They change job: from "the record" to "the annotations on the record".</figcaption>
+</figure>
+
+<h3>The mapping</h3>
+
+<p>Four events, four kinds of memory, one line each:</p>
+
+<div class="tl">
+  <div class="row"><span class="when">heard</span><span><code>message.received</code> – a person said something to it.</span></div>
+  <div class="row"><span class="when">thought</span><span><code>reasoning.completed</code> – its own reasoning, verbatim.</span></div>
+  <div class="row"><span class="when">said</span><span><code>message.completed</code> – what it said back.</span></div>
+  <div class="row"><span class="when">did</span><span><code>action.result</code> – a tool ran, with its name and status.</span></div>
+</div>
+
+<p>Put a real exchange through it and the log reads like a person's day rather than a request log:</p>
+
+<figure>
+  <div class="diagram">
+    <pre>13:51:29  heard    what's up?
+13:51:31  thought  User asked mid-conversation. Respond plainly, pick up the thread.
+13:51:31  did      mindlog_read (completed)
+13:51:34  thought  Mindlog says I was going to build the digest tool. Check whether I did.
+13:51:36  did      bash (completed)
+13:51:44  said     Two things since you last asked. One: I went looking for the mindlog…</pre>
+  </div>
+  <figcaption>This is the actual shape produced by the running agent. Nothing in it was written by the model on purpose.</figcaption>
+</figure>
+
+<h3>The one that carries the project</h3>
+
+<p><code>reasoning.completed</code> is why this commit exists. The agent's reasoning blocks <em>are</em> the inner monologue headlong is named after, and they are available for free because commit 1 set <code>reasoning: "medium"</code>. A summary the model writes afterwards is a performance for an audience; the reasoning is the thing itself, including the parts where it changes its mind or notices it is about to do something stupid. Capturing it turns the mindlog from a log of interactions into a record of a mind.</p>
+
+<div class="callout">
+  <span class="label">Key concept: faithful over tidy</span>
+  <p>Because capture is automatic, the mindlog contains things the agent would not have chosen to write down - false starts, mild self-contradiction, an idea abandoned mid-sentence. That is a feature. The next wake-up reads a truthful account rather than a press release, and in practice this is exactly what makes it catch its own earlier mistakes.</p>
+</div>
+
+<h2 id="code">The code</h2>
+
+<pre>// agent/hooks/mindlog-capture.ts
+import { defineHook } from "eve/hooks";
+import { append } from "../lib/mindlog";
+
+// Everything that happens to the agent lands in one timeline, whoever caused
+// it: a human message, its own reasoning, its own reply, a tool it ran.
+export default defineHook({
+  events: {
+    async "message.received"(event, ctx) {
+      await append({ kind: "heard", text: event.data.message, sessionId: ctx.session.id });
+    },
+    async "reasoning.completed"(event, ctx) {
+      await append({ kind: "thought", text: event.data.reasoning, sessionId: ctx.session.id });
+    },
+    async "message.completed"(event, ctx) {
+      if (event.data.message === null) return;
+      await append({ kind: "said", text: event.data.message, sessionId: ctx.session.id });
+    },
+    async "action.result"(event, ctx) {
+      const result = event.data.result as { toolName?: string; name?: string };
+      const name = result.toolName ?? result.name;
+      if (name === undefined) return;
+      await append({ kind: "did", text: `${name} (${event.data.status})`, sessionId: ctx.session.id });
+    },
+  },
+});</pre>
+
+<p>The whole feature. Four points worth drawing out.</p>
+
+<h4>Every entry carries <code>ctx.session.id</code></h4>
+
+<p>A cheap field with two later payoffs. It makes it possible to tell a chat turn from a heartbeat turn in the log, and in commit 6 it becomes the evidence that two cron fires ran in two different sessions - the measurement that exposes the persistence gap.</p>
+
+<h4><code>message.completed</code> can fire more than once</h4>
+
+<p>A model often emits some text, calls a tool, then emits more. Each block is a <code>message.completed</code>, so a turn with two tool calls can produce three <code>said</code> lines. The alternative - keeping only the block whose <code>finishReason</code> is terminal - would drop the interim narration, and it is often the most revealing part. Multiple lines it is.</p>
+
+<h4><code>action.result</code> logs the name, not the payload</h4>
+
+<p>Tool output is frequently enormous: a directory listing, a fetched page, forty lines of stdout. It is already in the session history, where the model can see it. The mindlog wants "I ran bash", not the bytes. So the entry is a name and a status, and the <code>?? result.name</code> fallback plus the <code>undefined</code> guard mean an unfamiliar action shape is skipped rather than logged as garbage.</p>
+
+<h4>The null check on <code>message.completed</code></h4>
+
+<p>The event's <code>message</code> is typed <code>string | null</code>: a step can complete with no visible text. <code>append()</code> would drop an empty string anyway - commit 2 put that rule in the writer - but the explicit return says at the call site that a text-free completion is normal, not a defect.</p>
+
+<div class="callout warn">
+  <span class="label">The gap this leaves</span>
+  <p>A heartbeat prompt (commit 4) arrives as <code>message.received</code>, so the mindlog will label the agent waking itself as <code>heard</code> - as if someone had said it. Truthful about the mechanism, wrong about the meaning. Commit 4 adds a <code>woke</code> kind to fix it.</p>
+</div>
+
+<h2 id="quiz">Quiz</h2>
+
+<div class="quiz">
+  <div class="q" data-answer="b" data-explain="A model that has to narrate its own life skips the bookkeeping exactly when it is busiest. Moving capture into the runtime makes the record independent of the model's cooperation.">
+    <span class="n">Question 1</span>
+    <p class="ask">What is the argument for capturing the timeline in a hook rather than instructing the model to log as it goes?</p>
+    <button class="opt" data-key="a">Hooks run before the model call, so the entries are available as context.</button>
+    <button class="opt" data-key="b">A model under load skips optional bookkeeping, so a model-written record thins out exactly when it matters most.</button>
+    <button class="opt" data-key="c">Tool calls cost tokens and hooks do not exist in the token budget.</button>
+    <button class="opt" data-key="d">Hooks can rewrite earlier entries, which the tools cannot.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="d" data-explain="Hooks are observe-only: they cannot inject anything into the model's context. That is precisely why capture belongs here - the recording can never alter the behaviour it records.">
+    <span class="n">Question 2</span>
+    <p class="ask">eve hooks cannot contribute anything to the model's context. Why does that make a hook the right home for capture?</p>
+    <button class="opt" data-key="a">It does not matter; a tool would work identically.</button>
+    <button class="opt" data-key="b">Because it means the hook runs synchronously before the model call.</button>
+    <button class="opt" data-key="c">Because context injection is only available to channels, which cannot write files.</button>
+    <button class="opt" data-key="d">Because it guarantees the act of recording cannot change the behaviour being recorded.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="a" data-explain="Reasoning blocks are the agent's actual thinking, including false starts and reversals. A summary written afterwards is a performance; the reasoning is the thing itself, which is what makes the log worth re-reading.">
+    <span class="n">Question 3</span>
+    <p class="ask">Of the four events captured, why is <code>reasoning.completed</code> the one the project is built around?</p>
+    <button class="opt" data-key="a">It is the agent's actual inner monologue, false starts included, rather than a tidied-up summary written for an audience.</button>
+    <button class="opt" data-key="b">It is the only event that carries a session id.</button>
+    <button class="opt" data-key="c">It fires exactly once per turn, so it is the cheapest to store.</button>
+    <button class="opt" data-key="d">It is the only event a hook is permitted to subscribe to.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="c" data-explain="Tool output is often huge and already lives in session history where the model can see it. The mindlog wants the fact that a tool ran, not its bytes.">
+    <span class="n">Question 4</span>
+    <p class="ask">Why does the <code>did</code> entry record only the tool name and status?</p>
+    <button class="opt" data-key="a">Because <code>action.result</code> does not expose the output to hooks.</button>
+    <button class="opt" data-key="b">Because tool output is not JSON-serialisable.</button>
+    <button class="opt" data-key="c">Because the payload is often large and already in session history; the log wants "I ran bash", not the stdout.</button>
+    <button class="opt" data-key="d">Because <code>append()</code> rejects entries over 4,000 characters.</button>
+    <div class="fb"></div>
+  </div>
+
+  <div class="q" data-answer="b" data-explain="A model commonly emits interim text, calls a tool, then emits more; each block is its own message.completed. Keeping them all preserves the narration, at the cost of several `said` lines per turn.">
+    <span class="n">Question 5</span>
+    <p class="ask">A single turn produces three <code>said</code> entries. Is that a bug?</p>
+    <button class="opt" data-key="a">Yes: only the block with a terminal <code>finishReason</code> should be written.</button>
+    <button class="opt" data-key="b">No: assistant text arrives in blocks around tool calls, and keeping each one preserves the interim narration.</button>
+    <button class="opt" data-key="c">Yes: it means the hook is registered twice.</button>
+    <button class="opt" data-key="d">No: eve deduplicates identical entries before they reach the file.</button>
+    <div class="fb"></div>
+  </div>
+</div>
+
+<div class="score" id="score">Answer a question to start scoring.</div>
+
+<p style="margin-top:3rem; color:var(--dim); font-size:.9rem">Next: commit 4 gives it a clock, and the log stops being a record of conversations.</p>
+</div>
+<script>
+let answered = 0;
+let correct = 0;
+const total = document.querySelectorAll(".q").length;
+
+document.querySelectorAll(".q").forEach((q) => {
+  const answer = q.dataset.answer;
+  q.querySelectorAll(".opt").forEach((opt) => {
+    opt.addEventListener("click", () => {
+      const chosen = opt.dataset.key;
+      q.querySelectorAll(".opt").forEach((o) => {
+        o.disabled = true;
+        if (o.dataset.key === answer) o.classList.add("right");
+        else if (o.dataset.key === chosen) o.classList.add("wrong");
+      });
+      answered += 1;
+      if (chosen === answer) correct += 1;
+      const fb = q.querySelector(".fb");
+      fb.textContent = (chosen === answer ? "Correct. " : "Not quite. ") + q.dataset.explain;
+      fb.classList.add("show");
+      const score = document.getElementById("score");
+      if (score) {
+        score.textContent = correct + " of " + answered + " right" +
+          (answered === total ? ". That is the whole set." : ", " + (total - answered) + " to go.");
+      }
+    });
+  });
+});
+</script>
+</body>
+</html>
