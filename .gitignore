@@ -1,0 +1,12 @@
+!.env.example
+.data/
+.DS_Store
+.env*
+.eve
+.next
+.nitro
+.output
+.vercel
+*.tsbuildinfo
+dist
+node_modules
