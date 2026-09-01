@@ -1,7 +1,7 @@
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-export type MindlogKind = "heard" | "thought" | "said" | "did" | "note";
+export type MindlogKind = "woke" | "heard" | "thought" | "said" | "did" | "note";
 
 export interface MindlogEntry {
   at: string;
