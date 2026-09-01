@@ -19,13 +19,13 @@ const capOutputTokens: LanguageModelMiddleware = {
 };
 
 export default defineAgent({
-  // Cheap open weights: $0.075/M in, $0.25/M out. Swap the id to change models.
+  // Cheap open weights: $0.08/M in, $0.16/M out. Swap the id to change models.
   model: wrapLanguageModel({
-    model: openrouter.chat("z-ai/glm-5.3-flash"),
+    model: openrouter.chat("deepseek/deepseek-v4-flash"),
     middleware: capOutputTokens,
   }),
   // Not in the AI Gateway catalog, so eve can't look the window up itself.
-  modelContextWindowTokens: 1_310_720,
+  modelContextWindowTokens: 1_048_576,
   reasoning: "medium",
   // Belt to the per-call cap's braces: stops a session that keeps calling.
   limits: {

@@ -1,7 +1,7 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import { defineHook } from "eve/hooks";
+import { defineHook, type HookContext } from "eve/hooks";
 import type { SandboxSession } from "eve/sandbox";
 
 import { FILE as MINDLOG_FILE } from "../lib/mindlog";
@@ -53,15 +53,22 @@ async function snapshot(sandbox: SandboxSession): Promise<string> {
 // fresh read-only copy in at the start of each turn: grep and jq then work on
 // the agent's own memory. Appends still go through mindlog_append, so a script
 // in the sandbox cannot corrupt the real log.
+let copied = "";
+
 async function refreshMindlogCopy(sandbox: SandboxSession): Promise<void> {
-  let text: string;
   try {
-    text = await readFile(MINDLOG_FILE, "utf8");
-  } catch {
-    return;
-  }
-  await sandbox.writeTextFile({ path: MINDLOG_COPY, content: text });
+    const { size, mtimeMs } = await stat(MINDLOG_FILE);
+    const stamp = `${sandbox.id}:${size}:${mtimeMs}`;
+    if (stamp === copied) return; // nothing appended since the last turn
+    const content = await readFile(MINDLOG_FILE, "utf8");
+    await sandbox.writeTextFile({ path: MINDLOG_COPY, content });
+    copied = stamp;
+  } catch {}
 }
+
+const keep = async (_event: unknown, ctx: HookContext): Promise<void> => {
+  console.info("[workspace-sync]", ctx.session.id, await snapshot(await ctx.getSandbox()));
+};
 
 export default defineHook({
   events: {
@@ -74,11 +81,8 @@ export default defineHook({
     async "turn.started"(_event, ctx) {
       await refreshMindlogCopy(await ctx.getSandbox());
     },
-    async "session.waiting"(_event, ctx) {
-      console.info("[workspace-sync]", ctx.session.id, await snapshot(await ctx.getSandbox()));
-    },
-    async "session.completed"(_event, ctx) {
-      console.info("[workspace-sync]", ctx.session.id, await snapshot(await ctx.getSandbox()));
-    },
+    // A session parks after most turns and completes when it ends for good.
+    "session.waiting": keep,
+    "session.completed": keep,
   },
 });

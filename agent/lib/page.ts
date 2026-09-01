@@ -21,6 +21,7 @@ export const PAGE = String.raw`<!doctype html>
     --bg: #eeece4;
     --panel: #f8f7f2;
     --rule: #dad5c8;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
     --hot: #a8481a;
     --cool: #46683f;
     --think: #56488c;
@@ -81,14 +82,14 @@ export const PAGE = String.raw`<!doctype html>
   header {
     display: flex; align-items: baseline; gap: .6rem;
     padding: .9rem 1.2rem; border-bottom: 1px solid var(--rule);
-    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-family: var(--mono);
     font-size: .68rem; letter-spacing: .14em; text-transform: uppercase;
     color: var(--dim); flex: 0 0 auto;
   }
   header b { color: var(--ink); font-weight: 700; }
   header .spacer { flex: 1; }
   button {
-    font: inherit; font-family: "JetBrains Mono", monospace; font-size: .62rem;
+    font: inherit; font-family: var(--mono); font-size: .62rem;
     letter-spacing: .12em; text-transform: uppercase;
     background: transparent; color: var(--dim);
     border: 1px solid var(--rule); border-radius: 2px;
@@ -99,7 +100,7 @@ export const PAGE = String.raw`<!doctype html>
   .scroll { flex: 1 1 auto; overflow-y: auto; padding: 1.2rem; }
   .msg { margin: 0 0 1.4rem; max-width: 60ch; }
   .msg .who {
-    font-family: "JetBrains Mono", monospace; font-size: .62rem;
+    font-family: var(--mono); font-size: .62rem;
     letter-spacing: .14em; text-transform: uppercase; color: var(--dim);
     display: block; margin-bottom: .25rem;
   }
@@ -114,12 +115,12 @@ export const PAGE = String.raw`<!doctype html>
   .msg ul, .msg ol { padding-left: 1.4rem; }
   .msg li { margin: 0 0 .3rem; }
   .msg code {
-    font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .82em;
+    font-family: var(--mono); font-size: .82em;
     background: var(--panel); border: 1px solid var(--rule); border-radius: 2px;
     padding: .05em .3em;
   }
   .msg pre {
-    font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .78rem;
+    font-family: var(--mono); font-size: .78rem;
     background: var(--panel); border: 1px solid var(--rule); border-radius: 2px;
     padding: .7rem .8rem; overflow-x: auto; white-space: pre;
   }
@@ -131,7 +132,7 @@ export const PAGE = String.raw`<!doctype html>
   }
   textarea:focus { outline: none; border-color: var(--hot); }
   .entry {
-    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-family: var(--mono);
     font-size: .82rem; line-height: 1.55;
     padding: .5rem 0; border-bottom: 1px dotted var(--faint);
     display: grid; grid-template-columns: 4.2rem 4rem 1fr; gap: .55rem;
@@ -260,36 +261,63 @@ function setMessage(body, text) {
   }
 }
 
+function el(tag, cls, text) {
+  const node = document.createElement(tag);
+  node.className = cls;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
 function bubble(cls, who, text) {
-  const empty = chat.querySelector(".empty");
-  if (empty) empty.remove();
-  const el = document.createElement("div");
-  el.className = "msg " + cls;
-  el.innerHTML = '<span class="who"></span><div class="body"></div>';
-  el.querySelector(".who").textContent = who;
-  const body = el.querySelector(".body");
+  chat.querySelector(".empty")?.remove();
+  const wrap = el("div", "msg " + cls);
+  const body = el("div", "body");
   setMessage(body, text);
-  chat.append(el);
+  wrap.append(el("span", "who", who), body);
+  chat.append(wrap);
   chat.scrollTop = chat.scrollHeight;
   return body;
 }
+
+let mindlogSeen = "";
 
 async function refreshMindlog() {
   const res = await fetch("/api/mindlog?limit=120");
   const { entries } = await res.json();
   if (entries.length === 0) return;
+
+  // The log is append-only, so length plus the newest timestamp is enough to
+  // know nothing changed. Polls that see nothing new leave the DOM untouched.
+  const seen = entries.length + ":" + entries[entries.length - 1].at;
+  if (seen === mindlogSeen) return;
+  mindlogSeen = seen;
+
   const atBottom = mindlogEl.scrollHeight - mindlogEl.scrollTop - mindlogEl.clientHeight < 60;
   mindlogEl.replaceChildren(...entries.map((e) => {
-    const row = document.createElement("div");
-    row.className = "entry";
+    const row = el("div", "entry");
     row.dataset.kind = e.kind;
-    row.innerHTML = '<span class="at"></span><span class="kind"></span><span class="text"></span>';
-    row.querySelector(".at").textContent = new Date(e.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
-    row.querySelector(".kind").textContent = e.kind;
-    row.querySelector(".text").textContent = e.text;
+    const at = new Date(e.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+    row.append(el("span", "at", at), el("span", "kind", e.kind), el("span", "text", e.text));
     return row;
   }));
   if (atBottom) mindlogEl.scrollTop = mindlogEl.scrollHeight;
+}
+
+async function readNdjson(res, onEvent) {
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+    for (const line of lines) {
+      if (line.trim() === "") continue;
+      try { onEvent(JSON.parse(line)); } catch {}
+    }
+  }
 }
 
 // One long-lived reader per session. A new session starts at 0; an existing one
@@ -299,25 +327,16 @@ async function follow(id, startIndex) {
     try {
       const res = await fetch("/eve/v1/session/" + id + "/stream?startIndex=" + startIndex);
       if (!res.ok) return;
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        for (const line of lines) {
-          if (line.trim() === "") continue;
-          try { handle(JSON.parse(line)); } catch {}
-        }
-      }
+      await readNdjson(res, handle);
     } catch {}
     startIndex = -1;
     await new Promise((r) => setTimeout(r, 1000));
   }
+}
+
+function showAssistant(text) {
+  if (!live) live = bubble("it", "it", "");
+  setMessage(live, text);
 }
 
 function handle(event) {
@@ -327,15 +346,11 @@ function handle(event) {
       statusEl.textContent = "thinking";
       break;
     case "message.appended":
-      if (!live) live = bubble("it", "it", "");
-      setMessage(live, data.messageSoFar || "");
+      showAssistant(data.messageSoFar || "");
       chat.scrollTop = chat.scrollHeight;
       break;
     case "message.completed":
-      if (data.message) {
-        if (!live) live = bubble("it", "it", "");
-        setMessage(live, data.message);
-      }
+      if (data.message) showAssistant(data.message);
       live = null;
       void refreshMindlog();
       break;
@@ -352,27 +367,25 @@ function handle(event) {
   }
 }
 
+function post(url, message) {
+  return fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message }),
+  });
+}
+
 async function send(text) {
   bubble("me", "you", text);
   statusEl.textContent = "thinking";
 
-  const fresh = sessionId === null;
-  const url = fresh ? "/eve/v1/session" : "/eve/v1/session/" + sessionId;
-  let res = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ message: text }),
-  });
+  let res = await post(sessionId ? "/eve/v1/session/" + sessionId : "/eve/v1/session", text);
 
   if (res.status === 409) {
     // The session expired or was retired. Start a new one with the same message.
     sessionId = null;
     localStorage.removeItem("nys.session");
-    res = await fetch("/eve/v1/session", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ message: text }),
-    });
+    res = await post("/eve/v1/session", text);
   }
 
   const started = await res.json();
@@ -506,24 +519,11 @@ async function restore(id) {
       statusEl.textContent = "idle";
       return;
     }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-      for (const line of lines) {
-        if (line.trim() === "") continue;
-        let event;
-        try { event = JSON.parse(line); } catch { continue; }
-        const data = event.data || {};
-        if (event.type === "message.received") bubble("me", "you", data.message || "");
-        else if (event.type === "message.completed" && data.message) bubble("it", "it", data.message);
-      }
-    }
+    await readNdjson(res, (event) => {
+      const data = event.data || {};
+      if (event.type === "message.received") bubble("me", "you", data.message || "");
+      else if (event.type === "message.completed" && data.message) bubble("it", "it", data.message);
+    });
   } catch {}
   statusEl.textContent = "idle";
   void follow(id, -1);

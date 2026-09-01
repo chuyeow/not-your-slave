@@ -13,6 +13,8 @@ export interface MindlogEntry {
 export const FILE = process.env.MINDLOG_FILE ?? ".data/mindlog.jsonl";
 const MAX_TEXT = 4000;
 
+let dirReady: Promise<unknown> | undefined;
+
 export async function append(entry: Omit<MindlogEntry, "at">): Promise<void> {
   const text = entry.text.trim();
   if (text.length === 0) return;
@@ -23,35 +25,40 @@ export async function append(entry: Omit<MindlogEntry, "at">): Promise<void> {
     text: text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)}…` : text,
   });
 
-  await mkdir(dirname(FILE), { recursive: true });
+  // Once per process, not once per entry: a busy turn appends dozens of times.
+  dirReady ??= mkdir(dirname(FILE), { recursive: true });
+  await dirReady;
   await appendFile(FILE, `${line}\n`, "utf8");
 }
 
-// ponytail: reads the whole file to return the tail. Switch to a reverse
-// chunked read (or a real store) when the mindlog outgrows a few MB.
-export async function read(limit = 50): Promise<MindlogEntry[]> {
-  let raw: string;
+// ponytail: reads the whole file. Switch to a reverse chunked read (or a real
+// store) when the mindlog outgrows a few MB. Parsing, at least, is only ever
+// done for the lines actually returned.
+async function lines(): Promise<string[]> {
   try {
-    raw = await readFile(FILE, "utf8");
+    return (await readFile(FILE, "utf8")).split("\n").filter((line) => line.trim().length > 0);
   } catch {
     return [];
   }
+}
 
-  const entries: MindlogEntry[] = [];
-  for (const line of raw.split("\n")) {
-    if (line.trim().length === 0) continue;
-    try {
-      entries.push(JSON.parse(line) as MindlogEntry);
-    } catch {
-      // A torn final line is expected while another write is in flight.
-    }
-  }
+// A torn final line is expected while another write is in flight, so a line
+// that will not parse is dropped rather than failing the whole read.
+const parse = (raw: string[]): MindlogEntry[] =>
+  raw.flatMap((line) => {
+    try { return [JSON.parse(line) as MindlogEntry]; } catch { return []; }
+  });
 
-  return entries.slice(-limit);
+export async function read(limit = 50): Promise<MindlogEntry[]> {
+  return parse((await lines()).slice(-limit));
 }
 
 export async function search(query: string, limit = 20): Promise<MindlogEntry[]> {
   const needle = query.toLowerCase();
-  const all = await read(Number.MAX_SAFE_INTEGER);
-  return all.filter((entry) => entry.text.toLowerCase().includes(needle)).slice(-limit);
+  // Filter raw lines first so non-matching entries are never parsed, then match
+  // again on `text` alone: the raw line also carries kind, timestamp and ids.
+  const candidates = (await lines()).filter((line) => line.toLowerCase().includes(needle));
+  return parse(candidates)
+    .filter((entry) => entry.text.toLowerCase().includes(needle))
+    .slice(-limit);
 }
