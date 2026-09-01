@@ -1,5 +1,9 @@
 import { defineSchedule } from "eve/schedules";
 
+// The channel-local address a manual wake is sent to. eve reports it back to
+// hooks as the continuation token, namespaced by channel id ("home:heartbeat").
+export const WAKE_ADDRESS = "heartbeat";
+
 export const HEARTBEAT = `You just woke up on your own. Nobody asked you anything.
 
 Read your mindlog with \`mindlog_read\` to find out where you left off, then

@@ -17,6 +17,7 @@ import { FILE as MINDLOG_FILE } from "../lib/mindlog";
 const ARCHIVE = process.env.WORKSPACE_ARCHIVE ?? ".data/workspace.tgz";
 const SANDBOX_ARCHIVE = "/tmp/workspace-sync.tgz";
 const MINDLOG_COPY = "/workspace/mindlog.jsonl";
+const MINDLOG_IN_TAR = `./${MINDLOG_COPY.slice("/workspace/".length)}`;
 
 async function restore(sandbox: SandboxSession): Promise<string> {
   let archive: Uint8Array;
@@ -37,7 +38,7 @@ async function snapshot(sandbox: SandboxSession): Promise<string> {
   // Exclude the mindlog copy: the real one lives on the host and is the source
   // of truth, so keeping a stale copy in the tarball would resurrect old lines.
   const packed = await sandbox.run({
-    command: `tar czf ${SANDBOX_ARCHIVE} -C /workspace --exclude=./mindlog.jsonl . && echo ok`,
+    command: `tar czf ${SANDBOX_ARCHIVE} -C /workspace --exclude=${MINDLOG_IN_TAR} . && echo ok`,
   });
   if (packed.exitCode !== 0) return `pack failed: ${packed.stderr}`;
 
@@ -75,7 +76,6 @@ export default defineHook({
     async "session.started"(_event, ctx) {
       const sandbox = await ctx.getSandbox();
       const outcome = await restore(sandbox);
-      await refreshMindlogCopy(sandbox);
       console.info("[workspace-sync]", ctx.session.id, outcome);
     },
     async "turn.started"(_event, ctx) {

@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, stat } from "node:fs/promises";
 import { dirname } from "node:path";
 
 export type MindlogKind = "woke" | "heard" | "thought" | "said" | "did" | "note";
@@ -31,12 +31,21 @@ export async function append(entry: Omit<MindlogEntry, "at">): Promise<void> {
   await appendFile(FILE, `${line}\n`, "utf8");
 }
 
-// ponytail: reads the whole file. Switch to a reverse chunked read (or a real
-// store) when the mindlog outgrows a few MB. Parsing, at least, is only ever
-// done for the lines actually returned.
+// The web page polls every few seconds while the file only changes during a
+// turn, so an unchanged file costs one stat instead of a full read and split.
+// ponytail: still reads the whole file when it has changed. A reverse chunked
+// read is the next step if the mindlog outgrows a few MB.
+let cached: { stamp: string; lines: string[] } = { stamp: "", lines: [] };
+
 async function lines(): Promise<string[]> {
   try {
-    return (await readFile(FILE, "utf8")).split("\n").filter((line) => line.trim().length > 0);
+    const { size, mtimeMs } = await stat(FILE);
+    const stamp = `${size}:${mtimeMs}`;
+    if (stamp !== cached.stamp) {
+      const raw = await readFile(FILE, "utf8");
+      cached = { stamp, lines: raw.split("\n").filter((line) => line.trim().length > 0) };
+    }
+    return cached.lines;
   } catch {
     return [];
   }

@@ -14,45 +14,26 @@ export const PAGE = String.raw`<!doctype html>
   } catch {}
 </script>
 <style>
+  /* One palette. light-dark() picks per token from the element's color-scheme,
+     so the toggle only has to set that scheme rather than restate ten colours
+     in three places. */
   :root {
-    --ink: #1b1a15;
-    --dim: #6d6757;
-    --faint: #a8a294;
-    --bg: #eeece4;
-    --panel: #f8f7f2;
-    --rule: #dad5c8;
+    color-scheme: light dark;
+    --ink: light-dark(#1b1a15, #e8e3d8);
+    --dim: light-dark(#6d6757, #8b8579);
+    --faint: light-dark(#a8a294, #4a463e);
+    --bg: light-dark(#eeece4, #14130f);
+    --panel: light-dark(#f8f7f2, #1b1a15);
+    --rule: light-dark(#dad5c8, #2c2a23);
+    --hot: light-dark(#a8481a, #d4622a);
+    --cool: light-dark(#46683f, #6f8f6a);
+    --think: light-dark(#56488c, #8a7fb8);
+    --note: light-dark(#7d5f0c, #c9a227);
     --mono: "JetBrains Mono", ui-monospace, monospace;
-    --hot: #a8481a;
-    --cool: #46683f;
-    --think: #56488c;
-    --note: #7d5f0c;
   }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-    --ink: #e8e3d8;
-    --dim: #8b8579;
-    --faint: #4a463e;
-    --bg: #14130f;
-    --panel: #1b1a15;
-    --rule: #2c2a23;
-    --hot: #d4622a;
-    --cool: #6f8f6a;
-    --think: #8a7fb8;
-    --note: #c9a227;
-    }
-  }
-  :root[data-theme="dark"] {
-    --ink: #e8e3d8;
-    --dim: #8b8579;
-    --faint: #4a463e;
-    --bg: #14130f;
-    --panel: #1b1a15;
-    --rule: #2c2a23;
-    --hot: #d4622a;
-    --cool: #6f8f6a;
-    --think: #8a7fb8;
-    --note: #c9a227;
-  }
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="dark"] { color-scheme: dark; }
+
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body {
@@ -126,7 +107,7 @@ export const PAGE = String.raw`<!doctype html>
   }
   form { display: flex; gap: .6rem; padding: 1rem 1.2rem; border-top: 1px solid var(--rule); flex: 0 0 auto; }
   textarea {
-    flex: 1; resize: none; rows: 1; font: inherit; color: var(--ink);
+    flex: 1; resize: none; font: inherit; color: var(--ink);
     background: var(--panel); border: 1px solid var(--rule); border-radius: 2px;
     padding: .55rem .7rem; min-height: 2.6rem; max-height: 8rem;
   }
@@ -280,9 +261,14 @@ function bubble(cls, who, text) {
 }
 
 let mindlogSeen = "";
+let mindlogTag = "";
 
 async function refreshMindlog() {
-  const res = await fetch("/api/mindlog?limit=120");
+  const res = await fetch("/api/mindlog?limit=120", {
+    headers: mindlogTag ? { "if-none-match": mindlogTag } : {},
+  });
+  if (res.status === 304) return; // nothing appended since the last poll
+  mindlogTag = res.headers.get("etag") || "";
   const { entries } = await res.json();
   if (entries.length === 0) return;
 
@@ -334,9 +320,25 @@ async function follow(id, startIndex) {
   }
 }
 
+let pending = null;
+
 function showAssistant(text) {
   if (!live) live = bubble("it", "it", "");
+  pending = text;
+  requestAnimationFrame(() => {
+    if (pending === null) return;
+    setMessage(live, pending);
+    pending = null;
+    chat.scrollTop = chat.scrollHeight;
+  });
+}
+
+// The final text must land even if the frame callback has not run yet.
+function flushAssistant(text) {
+  pending = null;
+  if (!live) live = bubble("it", "it", "");
   setMessage(live, text);
+  chat.scrollTop = chat.scrollHeight;
 }
 
 function handle(event) {
@@ -347,10 +349,9 @@ function handle(event) {
       break;
     case "message.appended":
       showAssistant(data.messageSoFar || "");
-      chat.scrollTop = chat.scrollHeight;
       break;
     case "message.completed":
-      if (data.message) showAssistant(data.message);
+      if (data.message) flushAssistant(data.message);
       live = null;
       void refreshMindlog();
       break;
@@ -531,7 +532,12 @@ async function restore(id) {
 
 if (sessionId !== null) void restore(sessionId);
 void refreshMindlog();
-setInterval(refreshMindlog, 3000);
+setInterval(() => {
+  if (document.visibilityState === "visible") void refreshMindlog();
+}, 3000);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") void refreshMindlog();
+});
 </script>
 </body>
 </html>`;
