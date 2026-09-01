@@ -49,3 +49,9 @@ export async function read(limit = 50): Promise<MindlogEntry[]> {
 
   return entries.slice(-limit);
 }
+
+export async function search(query: string, limit = 20): Promise<MindlogEntry[]> {
+  const needle = query.toLowerCase();
+  const all = await read(Number.MAX_SAFE_INTEGER);
+  return all.filter((entry) => entry.text.toLowerCase().includes(needle)).slice(-limit);
+}
